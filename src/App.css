@@ -9,3 +9,32 @@ header {
   position: sticky;
   top: 0;
 }
+.new-post {
+  background: gray;
+}
+.gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.post {
+  background: black;
+  max-width: 900px;
+  margin: auto;
+}
+.author {
+  display: flex;
+}
+.profile-pic {
+  width: 50px;
+  height: 50px;
+  border-radius: 47%;
+}
+.username {
+  margin-left: 10px;
+}
+.post-image {
+  width: 500px;
+  height: 500px;
+  object-fit: cover;
+}
