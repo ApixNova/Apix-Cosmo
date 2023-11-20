@@ -214,3 +214,13 @@ header img {
   /* height: 500px; */
   object-fit: cover;
 }
+.valid {
+  color: aqua;
+}
+.invalid {
+  color: red;
+}
+
+.succes {
+  color: green;
+}

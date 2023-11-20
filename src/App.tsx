@@ -13,7 +13,6 @@ import {
   limit,
   doc,
   addDoc,
-  getDoc,
   updateDoc,
   where,
   orderBy,
@@ -26,6 +25,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faPlus,
   faHeart as faHeartSolid,
+  faL,
 } from "@fortawesome/free-solid-svg-icons";
 import { faHeart as faHeartRegular } from "@fortawesome/free-regular-svg-icons";
 
@@ -42,27 +42,33 @@ const storage = getStorage();
 const postsRef = collection(db, "posts");
 const usersRef = collection(db, "users");
 
-type User = {
-  uid: string;
-  photoURL: string;
-  displayName: string;
+const usernameStructure: User = {
+  uid: "",
+  photoURL: "",
+  displayName: "",
+  followList: [],
 };
 
-function getUserInfo() {
+async function getUserInfo() {
   let uid = "";
   let displayName = "";
   let photoURL = "";
+  let followList: string[] = [];
   if (auth.currentUser) {
     uid = auth.currentUser.uid;
-    displayName = auth.currentUser.displayName as string;
-    photoURL = auth.currentUser.photoURL as string;
+    const q = query(usersRef, where("uid", "==", uid));
+    await getDocs(q).then((userInfo) => {
+      displayName = userInfo.docs[0].data().displayName;
+      photoURL = userInfo.docs[0].data().photoURL;
+      followList = userInfo.docs[0].data().followList;
+    });
   }
-  const result = {
+  return {
     uid,
     displayName,
     photoURL,
+    followList,
   };
-  return result;
 }
 
 function App() {
@@ -74,49 +80,70 @@ function App() {
   const [text, setText] = useState("");
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showUserOptions, setShowUserOptions] = useState(false);
-  const [currentUser, setCurrentUser] = useState(getUserInfo());
+  const [currentUser, setCurrentUser] = useState(usernameStructure);
   const [newUsername, setNewName] = useState("");
-  const [newUserInfo, setNewUserInfo] = useState("hola :D");
+  const [newUserInfo, setNewUserInfo] = useState({
+    state: "false",
+    value: "",
+  });
 
-  useEffect(() => {
-    setCurrentUser(getUserInfo());
-  }, [user]);
-
-  if (false) {
-    useEffect(() => {
-      //on sign in
-      const { uid } = auth.currentUser as User;
-      const userRef = doc(usersRef, uid);
-
-      async function checkUserData() {
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists() && userSnap.data().hasOwnProperty("username")) {
-          return true;
-        } else {
-          return false;
-        }
-      }
-      //check if user has a username
-
-      //if not ask to get a new one that doesn't exist yet
-      //user collection:
-      // uid, profile pic, follow list
-    }, []);
+  function updateUser() {
+    getUserInfo().then((result) => {
+      setCurrentUser(result);
+      return result;
+    });
   }
 
-  function changeUsername() {}
+  useEffect(() => {
+    updateUser();
+  }, [user]);
+
+  async function changeUsername(e: React.FormEvent) {
+    e.preventDefault();
+    //if new username valid
+    if (newUserInfo.state == "true") {
+      //update the users collection
+      const q = query(
+        usersRef,
+        where("displayName", "==", currentUser.displayName)
+      );
+
+      const snapshot = await getDocs(q);
+      const newUserRef = doc(db, "users", snapshot.docs[0].id);
+      await updateDoc(newUserRef, {
+        displayName: newUsername,
+      }).then(() => {
+        updateUser();
+        setNewUserInfo({
+          state: "succes",
+          value: newUsername + " is your new username",
+        });
+      });
+    }
+  }
 
   async function handleChangeUsername(newUsername: string) {
     //on every change
     setNewName(newUsername);
     //check if username available
     const q = query(usersRef, where("displayName", "==", newUsername));
-    setNewUserInfo("Loading...");
+    setNewUserInfo({ state: "false", value: "loading..." });
     const snapshot = await getDocs(q);
-    if (!snapshot.empty) {
-      setNewUserInfo("This username is already taken!");
+    if (newUsername == "") {
+      setNewUserInfo({
+        state: "false",
+        value: "invalid username",
+      });
+    } else if (!snapshot.empty) {
+      setNewUserInfo({
+        state: "false",
+        value: "This username is already taken",
+      });
     } else {
-      setNewUserInfo(newUsername + " is a valid username!");
+      setNewUserInfo({
+        state: "true",
+        value: newUsername + " is a valid username",
+      });
     }
   }
 
@@ -230,7 +257,7 @@ function App() {
       )}
       {showUserOptions && user && (
         <div id="user">
-          <form>
+          <form onSubmit={changeUsername}>
             <button
               type="button"
               onClick={() => {
@@ -239,9 +266,7 @@ function App() {
             >
               close
             </button>
-            <h1>Hello</h1>
-            <h2>Here you can change your user option</h2>
-            <p>Current username: {user.displayName}</p>
+            <h1>User Options</h1>
             <p>Current username: {currentUser.displayName}</p>
             <p>New username:</p>
             <input
@@ -249,7 +274,17 @@ function App() {
               value={newUsername}
               onChange={(e) => handleChangeUsername(e.target.value)}
             ></input>
-            <p style={{ color: "blue" }}>{newUserInfo}</p>
+            <p
+              className={
+                newUserInfo.state == "true"
+                  ? "valid"
+                  : newUserInfo.state == "false"
+                  ? "invalid"
+                  : "succes"
+              }
+            >
+              {newUserInfo.value}
+            </p>
             <button>Submit!</button>
           </form>
         </div>
@@ -326,19 +361,21 @@ function Post({ post, showProfile, user, postId }: any) {
           <button className="follow">Follow</button>
         </div>
         <img className="post-image" src={post.postUrl}></img>
-        {post.text && post.text.length < 137 ? (
+        {post.text && post.text.length < 237 ? (
           <p className="post-text">{post.text}</p>
         ) : (
           <>
             {post.text && (
-              <p className="post-text">
-                {text}
-                {!showAll && (
-                  <p className="show-more" onClick={showMore}>
-                    ...more
-                  </p>
-                )}
-              </p>
+              <div className="post-text">
+                <p>
+                  {text}
+                  {!showAll && (
+                    <span className="show-more" onClick={showMore}>
+                      ...more
+                    </span>
+                  )}
+                </p>
+              </div>
             )}
           </>
         )}
@@ -392,7 +429,7 @@ function SignIn() {
   const signInWithGoogle = () => {
     const provider = new GoogleAuthProvider();
     signInWithPopup(auth, provider).then(() => {
-      const { uid, photoURL, displayName } = auth.currentUser as User;
+      const { uid, photoURL, displayName } = auth.currentUser as UserLogin;
       const q = query(usersRef, where("uid", "==", uid));
       async function checkUserData() {
         const userSnap = await getDocs(q);
