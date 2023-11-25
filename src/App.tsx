@@ -18,6 +18,7 @@ import {
   orderBy,
   serverTimestamp,
   getDocs,
+  arrayUnion,
 } from "firebase/firestore";
 import { v4 } from "uuid";
 
@@ -25,7 +26,6 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faPlus,
   faHeart as faHeartSolid,
-  faL,
 } from "@fortawesome/free-solid-svg-icons";
 import { faHeart as faHeartRegular } from "@fortawesome/free-regular-svg-icons";
 
@@ -46,21 +46,23 @@ const usernameStructure: User = {
   uid: "",
   photoURL: "",
   displayName: "",
+  docId: "",
   followList: [],
 };
 
-async function getUserInfo() {
-  let uid = "";
+async function getUserInfo(id: string) {
+  let uid = id;
   let displayName = "";
   let photoURL = "";
+  let docId = "";
   let followList: string[] = [];
-  if (auth.currentUser) {
-    uid = auth.currentUser.uid;
-    const q = query(usersRef, where("uid", "==", uid));
+  if (id) {
+    const q = query(usersRef, where("uid", "==", id));
     await getDocs(q).then((userInfo) => {
       displayName = userInfo.docs[0].data().displayName;
       photoURL = userInfo.docs[0].data().photoURL;
       followList = userInfo.docs[0].data().followList;
+      docId = userInfo.docs[0].id;
     });
   }
   return {
@@ -68,6 +70,7 @@ async function getUserInfo() {
     displayName,
     photoURL,
     followList,
+    docId,
   };
 }
 
@@ -82,16 +85,23 @@ function App() {
   const [showUserOptions, setShowUserOptions] = useState(false);
   const [currentUser, setCurrentUser] = useState(usernameStructure);
   const [newUsername, setNewName] = useState("");
+  //filter for the gallery: "all" or "follow"
+  const [filter, setFilter] = useState("all");
   const [newUserInfo, setNewUserInfo] = useState({
     state: "false",
     value: "",
   });
+  const [showAlert, setShowAlert] = useState({
+    showAlert: false,
+    alertMessage: "",
+  });
 
   function updateUser() {
-    getUserInfo().then((result) => {
-      setCurrentUser(result);
-      return result;
-    });
+    if (user) {
+      getUserInfo(auth.currentUser!.uid).then((result) => {
+        setCurrentUser(result);
+      });
+    }
   }
 
   useEffect(() => {
@@ -108,14 +118,18 @@ function App() {
         where("displayName", "==", currentUser.displayName)
       );
 
+      //DEBUG
+      console.log("getDocs called");
       const snapshot = await getDocs(q);
       const newUserRef = doc(db, "users", snapshot.docs[0].id);
+      //DEBUG
+      console.log("updateDoc called");
       await updateDoc(newUserRef, {
         displayName: newUsername,
       }).then(() => {
         updateUser();
         setNewUserInfo({
-          state: "succes",
+          state: "success",
           value: newUsername + " is your new username",
         });
       });
@@ -123,11 +137,13 @@ function App() {
   }
 
   async function handleChangeUsername(newUsername: string) {
-    //on every change
     setNewName(newUsername);
+    //on every change
     //check if username available
     const q = query(usersRef, where("displayName", "==", newUsername));
     setNewUserInfo({ state: "false", value: "loading..." });
+    //DEBUG
+    console.log("getDocs called (to check username availability");
     const snapshot = await getDocs(q);
     if (newUsername == "") {
       setNewUserInfo({
@@ -157,6 +173,8 @@ function App() {
         //save post to firebase
         const { uid, photoURL, displayName } = currentUser;
         getDownloadURL(storageRef).then((url) => {
+          //DEBUG
+          console.log("addDoc called");
           addDoc(postsRef, {
             uid,
             text: text,
@@ -197,6 +215,33 @@ function App() {
           ></img>
         </div>
       </header>
+      <div className="toggle">
+        <button
+          className={(filter == "all" ? "" : " selected") + " toggle-btn left"}
+          onClick={() => setFilter("follow")}
+        >
+          Follow List
+        </button>
+        <button
+          className={(filter == "all" ? " selected" : "") + " toggle-btn right"}
+          onClick={() => setFilter("all")}
+        >
+          All Posts
+        </button>
+      </div>
+      {showAlert.showAlert && (
+        <div className="alert">
+          <button
+            className="close-btn"
+            onClick={() =>
+              setShowAlert((prev) => ({ ...prev, showAlert: false }))
+            }
+          >
+            <FontAwesomeIcon className="close" icon={faPlus} />
+          </button>
+          <p>{showAlert.alertMessage}</p>
+        </div>
+      )}
       {showUserMenu && (
         <div id="dropdown-menu">
           <div>{user ? <SignOut /> : <SignIn />}</div>
@@ -252,26 +297,37 @@ function App() {
               </div>
             )}
           </form>
-          <Gallery showProfile={showProfile} user={user} />
+          <Gallery
+            showProfile={showProfile}
+            user={user}
+            currentUser={currentUser}
+            updateUser={updateUser}
+            setShowAlert={setShowAlert}
+            filter={filter}
+          />
         </>
       )}
       {showUserOptions && user && (
         <div id="user">
+          <button
+            type="button"
+            className="close-btn"
+            onClick={() => {
+              setShowUserOptions(false);
+            }}
+          >
+            <FontAwesomeIcon icon={faPlus} className="close" />
+          </button>
           <form onSubmit={changeUsername}>
-            <button
-              type="button"
-              onClick={() => {
-                setShowUserOptions(false);
-              }}
-            >
-              close
-            </button>
             <h1>User Options</h1>
-            <p>Current username: {currentUser.displayName}</p>
-            <p>New username:</p>
+            <p>
+              Current username:{" "}
+              <span className="valid">{currentUser.displayName}</span>
+            </p>
             <input
               id="new-username"
               value={newUsername}
+              placeholder="New Username"
               onChange={(e) => handleChangeUsername(e.target.value)}
             ></input>
             <p
@@ -280,30 +336,54 @@ function App() {
                   ? "valid"
                   : newUserInfo.state == "false"
                   ? "invalid"
-                  : "succes"
+                  : "success"
               }
             >
               {newUserInfo.value}
             </p>
-            <button>Submit!</button>
+            <button className="submit-btn">Submit</button>
           </form>
         </div>
       )}
-      {display == "profile" && user && (
+      {display == "profile" && (
         <>
-          <Profile uid={profileId} showProfile={showProfile} />
+          <Profile
+            uid={profileId}
+            showProfile={showProfile}
+            user={user}
+            currentUser={currentUser}
+            updateUser={updateUser}
+            setShowAlert={setShowAlert}
+          />
         </>
       )}
     </>
   );
 }
 
-function Gallery({ showProfile, user }: any) {
-  const q = query(postsRef, limit(5), orderBy("createdAt", "desc"));
-  const [posts, loading, error] = useCollection(q);
+function Gallery({
+  showProfile,
+  user,
+  currentUser,
+  updateUser,
+  setShowAlert,
+  filter,
+}: any) {
+  function getQuery() {
+    if (filter == "follow") {
+      return query(
+        postsRef,
+        limit(3),
+        orderBy("createdAt", "desc"),
+        where("uid", "in", currentUser.followList)
+      );
+    } else {
+      return query(postsRef, limit(3), orderBy("createdAt", "desc"));
+    }
+  }
+  const [posts, loading, error] = useCollection(getQuery());
   return (
     <>
-      <h1>All Posts</h1>
       {error && <h2>Error: {JSON.stringify(error)}</h2>}
       {loading && <h2>Loading...</h2>}
       <div className="gallery">
@@ -315,6 +395,9 @@ function Gallery({ showProfile, user }: any) {
               showProfile={showProfile}
               user={user}
               postId={post.id}
+              currentUser={currentUser}
+              updateUser={updateUser}
+              setShowAlert={setShowAlert}
             />
           ))}
       </div>
@@ -322,11 +405,27 @@ function Gallery({ showProfile, user }: any) {
   );
 }
 
-function Post({ post, showProfile, user, postId }: any) {
+function Post({
+  post,
+  showProfile,
+  user,
+  postId,
+  currentUser,
+  updateUser,
+  setShowAlert,
+}: any) {
   const [likedBy, setLikedBy] = useState(post.likedBy);
   const [text, setText] = useState(post.text?.slice(0, 237));
   const [showAll, setShowAll] = useState(false);
+  const [author, setAuthor] = useState(usernameStructure);
   const uid = auth.currentUser?.uid;
+
+  //get user info on mount:
+  useEffect(() => {
+    getUserInfo(post.uid).then((result) => {
+      setAuthor(result);
+    });
+  }, []);
 
   function showMore() {
     setShowAll(true);
@@ -340,6 +439,8 @@ function Post({ post, showProfile, user, postId }: any) {
     if (post.likedBy.includes(uid)) {
       //unlike post
       const updatedList = post.likedBy.filter((id: String) => id != uid);
+      //DEBUG
+      console.log("updateDoc called");
       await updateDoc(postRef, {
         likedBy: updatedList,
       }).then(() => setLikedBy(updatedList));
@@ -347,18 +448,48 @@ function Post({ post, showProfile, user, postId }: any) {
       //like post
       const updatedList = post.likedBy;
       updatedList.push(uid);
+      //DEBUG
+      console.log("updateDoc called");
       await updateDoc(postRef, {
         likedBy: updatedList,
       }).then(() => setLikedBy(updatedList));
     }
   }
+  async function followUser() {
+    //update user collection and change followList
+    const newUserRef = doc(db, "users", currentUser.docId);
+    //DEBUG
+    console.log("updateDoc called");
+    updateDoc(newUserRef, {
+      followList: arrayUnion(post.uid),
+    }).then(() => updateUser());
+  }
+  function handleFollow() {
+    if (user) {
+      followUser();
+    } else {
+      setShowAlert({
+        showAlert: true,
+        alertMessage: "You need to be logged in to follow a user",
+      });
+    }
+  }
+  function isFollowed() {
+    return currentUser.followList.includes(post.uid);
+  }
   return (
     <>
       <div className="post">
-        <div className="author" onClick={() => showProfile(post.uid)}>
-          <img src={post.photoURL} className="profile-pic"></img>
-          <p className="username">{post.displayName}</p>
-          <button className="follow">Follow</button>
+        <div className="author">
+          <div className="show-profile" onClick={() => showProfile(post.uid)}>
+            <img src={author.photoURL} className="profile-pic"></img>
+            <p className="username">{author.displayName}</p>
+          </div>
+          {!isFollowed() && (
+            <button className="follow" onClick={handleFollow}>
+              Follow
+            </button>
+          )}
         </div>
         <img className="post-image" src={post.postUrl}></img>
         {post.text && post.text.length < 237 ? (
@@ -389,7 +520,12 @@ function Post({ post, showProfile, user, postId }: any) {
           ) : (
             <FontAwesomeIcon
               className="heart"
-              onClick={likePost}
+              onClick={() =>
+                setShowAlert({
+                  showAlert: true,
+                  alertMessage: "You need to be logged in to like a post",
+                })
+              }
               icon={faHeartRegular}
             />
           )}
@@ -400,25 +536,45 @@ function Post({ post, showProfile, user, postId }: any) {
   );
 }
 
-function Profile({ uid, showProfile }: any) {
+function Profile({
+  uid,
+  showProfile,
+  user,
+  currentUser,
+  updateUser,
+  setShowAlert,
+}: any) {
+  const [userInfo, setUserInfo] = useState(usernameStructure);
   //make a query for all posts
   const q = query(
     postsRef,
     where("uid", "==", uid),
-    limit(10),
+    limit(3),
     orderBy("createdAt", "desc")
   );
   const [posts, loading, error] = useCollection(q);
+  getUserInfo(uid).then((result) => {
+    setUserInfo(result);
+  });
 
   return (
     <>
-      <h1>User Profile</h1>
-      {error && <h2>Error: {JSON.stringify(error)}</h2>}
+      <h1>{userInfo.displayName}'s profile</h1>
+      {error && <h2>Error: can't load content</h2>}
       {loading && <h2>Loading...</h2>}
       <div className="gallery">
         {posts &&
           posts.docs.map((post) => (
-            <Post key={post.id} post={post.data()} showProfile={showProfile} />
+            <Post
+              key={post.id}
+              post={post.data()}
+              showProfile={showProfile}
+              user={user}
+              postId={post.id}
+              currentUser={currentUser}
+              updateUser={updateUser}
+              setShowAlert={setShowAlert}
+            />
           ))}
       </div>
     </>
@@ -432,16 +588,22 @@ function SignIn() {
       const { uid, photoURL, displayName } = auth.currentUser as UserLogin;
       const q = query(usersRef, where("uid", "==", uid));
       async function checkUserData() {
+        //DEBUG
+        console.log("getDocs called (checkUserData)");
         const userSnap = await getDocs(q);
         //after sign in check if user is in the user collection, otherwise create a
         //new user
         if (userSnap.empty) {
+          //DEBUG
+          console.log("addDoc called");
           addDoc(usersRef, {
             uid,
             photoURL,
             displayName,
             followList: [],
           });
+        } else {
+          console.log("user already in db");
         }
       }
       checkUserData();

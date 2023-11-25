@@ -8,4 +8,5 @@ type User = {
   photoURL: string;
   displayName: string;
   followList: string[];
+  docId: string;
 };
