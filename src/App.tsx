@@ -19,6 +19,7 @@ import {
   serverTimestamp,
   getDocs,
   arrayUnion,
+  deleteDoc,
 } from "firebase/firestore";
 import { v4 } from "uuid";
 
@@ -95,6 +96,45 @@ function App() {
     showAlert: false,
     alertMessage: "",
   });
+  //WIP
+  const [giveChoice, setGiveChoice] = useState(false);
+  const [postToDelete, setPostToDelete] = useState("");
+  function handleDelete(confirmed: boolean) {
+    //alert to ask for confirmation
+    if (confirmed) {
+      if (user) {
+        console.log("delete post: " + postToDelete);
+        deleteDoc(doc(db, "posts", postToDelete))
+          .then(() => {
+            setShowAlert({
+              showAlert: true,
+              alertMessage: "Post Succesfully deleted",
+            });
+            setGiveChoice(false);
+            setPostToDelete("");
+          })
+          .catch((error) => {
+            setShowAlert({
+              showAlert: true,
+              alertMessage: "Error: " + JSON.stringify(error),
+            });
+          });
+      } else {
+        setGiveChoice(false);
+        setShowAlert({
+          showAlert: true,
+          alertMessage: "You must be logged in to delete your posts",
+        });
+      }
+    } else {
+      setShowAlert({
+        showAlert: false,
+        alertMessage: "",
+      });
+      setGiveChoice(false);
+    }
+  }
+  //WIP
 
   function updateUser() {
     if (user) {
@@ -107,6 +147,12 @@ function App() {
   useEffect(() => {
     updateUser();
   }, [user]);
+
+  useEffect(() => {
+    if (currentUser.followList.length > 0) {
+      setFilter("follow");
+    }
+  }, [currentUser]);
 
   async function changeUsername(e: React.FormEvent) {
     e.preventDefault();
@@ -141,7 +187,7 @@ function App() {
     //on every change
     //check if username available
     const q = query(usersRef, where("displayName", "==", newUsername));
-    setNewUserInfo({ state: "false", value: "loading..." });
+    setNewUserInfo({ state: "false", value: "Loading..." });
     //DEBUG
     console.log("getDocs called (to check username availability");
     const snapshot = await getDocs(q);
@@ -165,7 +211,9 @@ function App() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (image) {
+    //DEBUG
+    console.log("submit called");
+    if (image && user) {
       const storageRef = ref(storage, `posts/${image?.name + v4()}`);
       //upload file
       uploadBytes(storageRef, image as File).then(() => {
@@ -187,15 +235,27 @@ function App() {
             console.log("post created");
             setImage(null);
             setNewPost(false);
+            setText("");
           });
         });
       });
     }
   }
 
-  function showProfile(user: String) {
-    setProfileId(user);
+  function showProfile(userId: String) {
+    setProfileId(userId);
     setDisplay("profile");
+  }
+
+  function handleFilter() {
+    if (user) {
+      setFilter("follow");
+    } else {
+      setShowAlert({
+        showAlert: true,
+        alertMessage: "You must login to follow users",
+      });
+    }
   }
 
   return (
@@ -218,7 +278,7 @@ function App() {
       <div className="toggle">
         <button
           className={(filter == "all" ? "" : " selected") + " toggle-btn left"}
-          onClick={() => setFilter("follow")}
+          onClick={() => handleFilter()}
         >
           Follow List
         </button>
@@ -239,7 +299,18 @@ function App() {
           >
             <FontAwesomeIcon className="close" icon={faPlus} />
           </button>
+          <div className="separation"></div>
           <p>{showAlert.alertMessage}</p>
+          {giveChoice && (
+            <div className="choice">
+              <button className="confirm" onClick={() => handleDelete(true)}>
+                Yes
+              </button>
+              <button className="deny" onClick={() => handleDelete(false)}>
+                No
+              </button>
+            </div>
+          )}
         </div>
       )}
       {showUserMenu && (
@@ -269,32 +340,52 @@ function App() {
               />
             </button>
             {newPost && (
-              <div className="new-post">
-                <h2>Create a new post</h2>
-                <p>Image</p>
-                <input
-                  type="file"
-                  id="image-input"
-                  accept="image/*"
-                  onChange={(e: any) => {
-                    setImage(e.target.files[0]);
-                  }}
-                ></input>
-                <img
-                  id="preview"
-                  src={image ? window.URL.createObjectURL(image) : undefined}
-                ></img>
-                <h2>Text</h2>
-                <textarea
-                  id="text-input"
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder="text..."
-                ></textarea>
-                <button id="submit-button" type="submit">
-                  Submit
-                </button>
-              </div>
+              <>
+                {user ? (
+                  <div className="new-post">
+                    <h2>
+                      <span className="tiny">✦</span>New Post
+                      <span className="tiny">✦</span>
+                    </h2>
+                    <input
+                      type="file"
+                      id="image-input"
+                      accept="image/*"
+                      onChange={(e: any) => {
+                        setImage(e.target.files[0]);
+                      }}
+                    ></input>
+                    <img
+                      id="preview"
+                      src={
+                        image ? window.URL.createObjectURL(image) : undefined
+                      }
+                    ></img>
+                    <textarea
+                      id="text-input"
+                      value={text}
+                      onChange={(e) => setText(e.target.value)}
+                      placeholder="text..."
+                    ></textarea>
+                    <button id="submit-button" type="submit">
+                      Submit
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="new-post">
+                      <h2>
+                        <span className="tiny">✦</span>Sign in
+                        <span className="tiny">✦</span>
+                      </h2>
+                      <p>You need to be signed in to upload content</p>
+                      <div className="sign-in-wrapper">
+                        <SignIn />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </>
             )}
           </form>
           <Gallery
@@ -304,46 +395,55 @@ function App() {
             updateUser={updateUser}
             setShowAlert={setShowAlert}
             filter={filter}
+            setPostToDelete={setPostToDelete}
+            setGiveChoice={setGiveChoice}
           />
         </>
       )}
       {showUserOptions && user && (
-        <div id="user">
-          <button
-            type="button"
-            className="close-btn"
-            onClick={() => {
-              setShowUserOptions(false);
-            }}
-          >
-            <FontAwesomeIcon icon={faPlus} className="close" />
-          </button>
-          <form onSubmit={changeUsername}>
-            <h1>User Options</h1>
-            <p>
-              Current username:{" "}
-              <span className="valid">{currentUser.displayName}</span>
-            </p>
-            <input
-              id="new-username"
-              value={newUsername}
-              placeholder="New Username"
-              onChange={(e) => handleChangeUsername(e.target.value)}
-            ></input>
-            <p
-              className={
-                newUserInfo.state == "true"
-                  ? "valid"
-                  : newUserInfo.state == "false"
-                  ? "invalid"
-                  : "success"
-              }
+        <>
+          <div className="background"></div>
+          <div id="user">
+            <button
+              type="button"
+              className="close-btn"
+              onClick={() => {
+                setShowUserOptions(false);
+              }}
             >
-              {newUserInfo.value}
-            </p>
-            <button className="submit-btn">Submit</button>
-          </form>
-        </div>
+              <FontAwesomeIcon icon={faPlus} className="close" />
+            </button>
+            <form onSubmit={changeUsername}>
+              <h2>
+                <span className="tiny">✦</span>User Options
+                <span className="tiny">✦</span>
+              </h2>
+              <div className="separation"></div>
+              <p>
+                Current username:{" "}
+                <span className="valid">{currentUser.displayName}</span>
+              </p>
+              <input
+                id="new-username"
+                value={newUsername}
+                placeholder="New Username"
+                onChange={(e) => handleChangeUsername(e.target.value)}
+              ></input>
+              <p
+                className={
+                  newUserInfo.state == "true"
+                    ? "valid"
+                    : newUserInfo.state == "false"
+                    ? "invalid"
+                    : "success"
+                }
+              >
+                {newUserInfo.value}
+              </p>
+              <button className="submit-btn">Submit</button>
+            </form>
+          </div>
+        </>
       )}
       {display == "profile" && (
         <>
@@ -368,6 +468,8 @@ function Gallery({
   updateUser,
   setShowAlert,
   filter,
+  setPostToDelete,
+  setGiveChoice,
 }: any) {
   function getQuery() {
     if (filter == "follow") {
@@ -398,6 +500,8 @@ function Gallery({
               currentUser={currentUser}
               updateUser={updateUser}
               setShowAlert={setShowAlert}
+              setPostToDelete={setPostToDelete}
+              setGiveChoice={setGiveChoice}
             />
           ))}
       </div>
@@ -413,9 +517,11 @@ function Post({
   currentUser,
   updateUser,
   setShowAlert,
+  setPostToDelete,
+  setGiveChoice,
 }: any) {
   const [likedBy, setLikedBy] = useState(post.likedBy);
-  const [text, setText] = useState(post.text?.slice(0, 237));
+  const [text, setText] = useState(post.text?.slice(0, 137));
   const [showAll, setShowAll] = useState(false);
   const [author, setAuthor] = useState(usernameStructure);
   const uid = auth.currentUser?.uid;
@@ -490,9 +596,25 @@ function Post({
               Follow
             </button>
           )}
+          {author.uid == currentUser.uid && (
+            <button
+              type="button"
+              className="close-btn"
+              onClick={() => {
+                setPostToDelete(postId);
+                setGiveChoice(true);
+                setShowAlert({
+                  showAlert: true,
+                  alertMessage: "Are you sure you want to delete this post?",
+                });
+              }}
+            >
+              <FontAwesomeIcon icon={faPlus} className="close delete" />
+            </button>
+          )}
         </div>
         <img className="post-image" src={post.postUrl}></img>
-        {post.text && post.text.length < 237 ? (
+        {post.text && post.text.length <= 137 ? (
           <p className="post-text">{post.text}</p>
         ) : (
           <>
@@ -559,7 +681,9 @@ function Profile({
 
   return (
     <>
-      <h1>{userInfo.displayName}'s profile</h1>
+      <h1>
+        {userInfo.displayName != "" ? userInfo.displayName + "'s profile" : ""}
+      </h1>
       {error && <h2>Error: can't load content</h2>}
       {loading && <h2>Loading...</h2>}
       <div className="gallery">
