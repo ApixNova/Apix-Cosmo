@@ -5,7 +5,8 @@ type UserLogin = {
 };
 type User = {
   uid: string;
-  photoURL: string;
+  smallPic: string;
+  fullPic: string;
   displayName: string;
   followList: string[];
   docId: string;

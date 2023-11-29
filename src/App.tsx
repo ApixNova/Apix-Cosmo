@@ -52,31 +52,42 @@ const usersRef = collection(db, "users");
 
 const usernameStructure: User = {
   uid: "",
-  photoURL: "",
+  smallPic: "",
+  fullPic: "",
   displayName: "",
   docId: "",
   followList: [],
 };
 
 async function getUserInfo(id: string) {
-  let uid = id;
+  const uid = id;
   let displayName = "";
-  let photoURL = "";
+  let smallPic = "";
+  let fullPic = "";
   let docId = "";
   let followList: string[] = [];
   if (id) {
-    const q = query(usersRef, where("uid", "==", id));
+    const q = query(usersRef, where("uid", "==", uid));
     await getDocs(q).then((userInfo) => {
       displayName = userInfo.docs[0].data().displayName;
-      photoURL = userInfo.docs[0].data().photoURL;
+      smallPic = userInfo.docs[0].data().smallPic;
+      fullPic = userInfo.docs[0].data().fullPic;
       followList = userInfo.docs[0].data().followList;
       docId = userInfo.docs[0].id;
     });
+    if (!smallPic) {
+      //use the default profile pic
+      const refDefaultPic = ref(storage, `profile-pics/default/black.png`);
+      const url = await getDownloadURL(refDefaultPic);
+      smallPic = url;
+      fullPic = url;
+    }
   }
   return {
     uid,
     displayName,
-    photoURL,
+    smallPic,
+    fullPic,
     followList,
     docId,
   };
@@ -245,15 +256,13 @@ function App() {
       uploadBytes(storageRef, image as File).then(() => {
         console.log("file uploaded!");
         //save post to firebase
-        const { uid, photoURL, displayName } = currentUser;
+        const { uid } = currentUser;
         getDownloadURL(storageRef).then((url) => {
           //DEBUG
           console.log("addDoc called");
           addDoc(postsRef, {
             uid,
             text: text,
-            photoURL,
-            displayName,
             postUrl: url,
             createdAt: serverTimestamp(),
             likedBy: [],
@@ -624,7 +633,7 @@ function Post({ postProps, userProps, appProps }: any) {
       <div className="post">
         <div className="author">
           <div className="show-profile" onClick={() => showProfile(post.uid)}>
-            <img src={author.photoURL} className="profile-pic"></img>
+            <img src={author.smallPic} className="profile-pic"></img>
             <p className="username">{author.displayName}</p>
           </div>
           {!isFollowed() && (
@@ -777,7 +786,7 @@ function Profile({ userProps, appProps }: any) {
       <div className="profile">
         <img
           draggable={false}
-          src={userInfo.photoURL}
+          src={userInfo.fullPic}
           alt={userInfo.displayName + "'s profile picture"}
         ></img>
         <h1>{userInfo.displayName}</h1>
@@ -805,7 +814,7 @@ function Profile({ userProps, appProps }: any) {
               src={
                 newProfilePic
                   ? window.URL.createObjectURL(newProfilePic)
-                  : currentUser.photoURL
+                  : currentUser.fullPic
               }
               alt={currentUser.displayName + "'s profile picture"}
               onClick={handleClick}
@@ -862,14 +871,35 @@ function SignIn() {
         if (userSnap.empty) {
           //DEBUG
           console.log("addDoc called");
+          //use the default profile pic
+          const refDefaultPic = ref(storage, `profile-pics/default/black.png`);
+          const url = await getDownloadURL(refDefaultPic);
+          const smallPic = url;
+          const fullPic = url;
           addDoc(usersRef, {
             uid,
-            photoURL,
+            smallPic,
+            fullPic,
             displayName,
             followList: [],
           });
         } else {
           console.log("user already in db");
+          if (!userSnap.docs[0].data().smallPic) {
+            console.log("no profile pic found, assignign the default one...");
+            const refDefaultPic = ref(
+              storage,
+              `profile-pics/default/black.png`
+            );
+            const url = await getDownloadURL(refDefaultPic);
+            const smallPic = url;
+            const fullPic = url;
+            const userRef = doc(db, "users", userSnap.docs[0].id);
+            await updateDoc(userRef, {
+              smallPic: url,
+              fullPic: url,
+            });
+          }
         }
       }
       checkUserData();
