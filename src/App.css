@@ -185,6 +185,9 @@ header img {
   }
 }
 .new-post {
+  align-items: center;
+}
+.edit {
   background: rgb(16, 16, 17);
   position: fixed;
   left: 50%;
@@ -197,13 +200,27 @@ header img {
   display: flex;
   gap: 20px;
   flex-direction: column;
-  align-items: center;
   border: 1px solid black;
   box-shadow: rgba(0, 0, 0, 0.19) 0px 10px 20px, rgba(0, 0, 0, 0.23) 0px 6px 6px;
   padding: 5px;
   border-radius: 8px;
   animation: appear 200ms;
   z-index: 1;
+}
+.info img {
+  width: 150px;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 2px solid black;
+  margin-left: auto;
+  margin-right: auto;
+}
+.info img:hover {
+  border-color: white;
+  cursor: pointer;
+}
+.info button {
 }
 @keyframes appear {
   0% {
@@ -337,6 +354,26 @@ header img {
   user-select: none;
   cursor: pointer;
 }
+.profile {
+  /* background: #7599b8; */
+  border: 2px solid #ffffff;
+  border-radius: 20px;
+  width: 80%;
+  margin: auto auto 20px auto;
+  display: flex;
+  flex-direction: column;
+  /* height: 500px; */
+  justify-content: center;
+  align-items: center;
+}
+.profile img {
+  border-radius: 50%;
+  width: 150px;
+  margin-top: 25px;
+}
+.profile button {
+  margin-bottom: 20px;
+}
 .profile-pic {
   width: 50px;
   height: 50px;
@@ -347,9 +384,7 @@ header img {
   margin-left: 10px;
 }
 .post-image {
-  /* max-width: 200px; */
   width: 100%;
-  /* background-size: contain; */
   margin: auto;
   object-fit: contain;
 }

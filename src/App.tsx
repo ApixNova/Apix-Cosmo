@@ -1,7 +1,7 @@
 import "./App.css";
 import person from "./assets/person.svg";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, ChangeEvent } from "react";
 import { initializeApp } from "firebase/app";
 import { GoogleAuthProvider, signInWithPopup, getAuth } from "firebase/auth";
 import { useAuthState } from "react-firebase-hooks/auth";
@@ -31,7 +31,14 @@ import {
 import { faHeart as faHeartRegular } from "@fortawesome/free-regular-svg-icons";
 
 //to handle files
-import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
+import {
+  deleteObject,
+  getDownloadURL,
+  getStorage,
+  ref,
+  uploadBytes,
+} from "firebase/storage";
+import Resizer from "react-image-file-resizer";
 
 // Initialize Firebase
 const app = initializeApp(JSON.parse(import.meta.env.VITE_FIREBASE_CONFIG));
@@ -75,6 +82,27 @@ async function getUserInfo(id: string) {
   };
 }
 
+async function resizePic(
+  file: File
+): Promise<string | File | Blob | ProgressEvent<FileReader>> {
+  return new Promise((resolve) => {
+    Resizer.imageFileResizer(
+      file,
+      48,
+      48,
+      "JPEG",
+      100,
+      0,
+      (uri) => {
+        resolve(uri);
+      },
+      "base64",
+      20,
+      20
+    );
+  });
+}
+
 function App() {
   const [user] = useAuthState(auth);
   const [newPost, setNewPost] = useState(false);
@@ -96,7 +124,6 @@ function App() {
     showAlert: false,
     alertMessage: "",
   });
-  //WIP
   const [giveChoice, setGiveChoice] = useState(false);
   const [postToDelete, setPostToDelete] = useState("");
   function handleDelete(confirmed: boolean) {
@@ -134,7 +161,6 @@ function App() {
       setGiveChoice(false);
     }
   }
-  //WIP
 
   function updateUser() {
     if (user) {
@@ -342,7 +368,7 @@ function App() {
             {newPost && (
               <>
                 {user ? (
-                  <div className="new-post">
+                  <div className="edit new-post">
                     <h2>
                       <span className="tiny">✦</span>New Post
                       <span className="tiny">✦</span>
@@ -373,7 +399,7 @@ function App() {
                   </div>
                 ) : (
                   <>
-                    <div className="new-post">
+                    <div className="edit new-post">
                       <h2>
                         <span className="tiny">✦</span>Sign in
                         <span className="tiny">✦</span>
@@ -389,14 +415,18 @@ function App() {
             )}
           </form>
           <Gallery
-            showProfile={showProfile}
-            user={user}
-            currentUser={currentUser}
-            updateUser={updateUser}
-            setShowAlert={setShowAlert}
-            filter={filter}
-            setPostToDelete={setPostToDelete}
-            setGiveChoice={setGiveChoice}
+            userProps={{
+              user,
+              currentUser,
+              updateUser,
+            }}
+            appProps={{
+              showProfile,
+              setShowAlert,
+              filter,
+              setPostToDelete,
+              setGiveChoice,
+            }}
           />
         </>
       )}
@@ -448,12 +478,18 @@ function App() {
       {display == "profile" && (
         <>
           <Profile
-            uid={profileId}
-            showProfile={showProfile}
-            user={user}
-            currentUser={currentUser}
-            updateUser={updateUser}
-            setShowAlert={setShowAlert}
+            userProps={{
+              user,
+              currentUser,
+              updateUser,
+              uid: profileId,
+            }}
+            appProps={{
+              showProfile,
+              setShowAlert,
+              setPostToDelete,
+              setGiveChoice,
+            }}
           />
         </>
       )}
@@ -461,16 +497,10 @@ function App() {
   );
 }
 
-function Gallery({
-  showProfile,
-  user,
-  currentUser,
-  updateUser,
-  setShowAlert,
-  filter,
-  setPostToDelete,
-  setGiveChoice,
-}: any) {
+function Gallery({ userProps, appProps }: any) {
+  const { user, currentUser, updateUser } = userProps;
+  const { showProfile, setShowAlert, filter, setPostToDelete, setGiveChoice } =
+    appProps;
   function getQuery() {
     if (filter == "follow") {
       return query(
@@ -483,6 +513,10 @@ function Gallery({
       return query(postsRef, limit(3), orderBy("createdAt", "desc"));
     }
   }
+  useEffect(() => {
+    //DEBUG
+    console.log("Gallery mounted");
+  }, []);
   const [posts, loading, error] = useCollection(getQuery());
   return (
     <>
@@ -493,15 +527,21 @@ function Gallery({
           posts.docs.map((post) => (
             <Post
               key={post.id}
-              post={post.data()}
-              showProfile={showProfile}
-              user={user}
-              postId={post.id}
-              currentUser={currentUser}
-              updateUser={updateUser}
-              setShowAlert={setShowAlert}
-              setPostToDelete={setPostToDelete}
-              setGiveChoice={setGiveChoice}
+              postProps={{
+                post: post.data(),
+                postId: post.id,
+              }}
+              userProps={{
+                user,
+                currentUser,
+                updateUser,
+              }}
+              appProps={{
+                showProfile,
+                setShowAlert,
+                setPostToDelete,
+                setGiveChoice,
+              }}
             />
           ))}
       </div>
@@ -509,17 +549,11 @@ function Gallery({
   );
 }
 
-function Post({
-  post,
-  showProfile,
-  user,
-  postId,
-  currentUser,
-  updateUser,
-  setShowAlert,
-  setPostToDelete,
-  setGiveChoice,
-}: any) {
+function Post({ postProps, userProps, appProps }: any) {
+  const { post, postId } = postProps;
+  const { user, currentUser, updateUser } = userProps;
+  const { showProfile, setShowAlert, setPostToDelete, setGiveChoice } =
+    appProps;
   const [likedBy, setLikedBy] = useState(post.likedBy);
   const [text, setText] = useState(post.text?.slice(0, 137));
   const [showAll, setShowAll] = useState(false);
@@ -528,6 +562,8 @@ function Post({
 
   //get user info on mount:
   useEffect(() => {
+    //DEBUG
+    console.log("Post mounted");
     getUserInfo(post.uid).then((result) => {
       setAuthor(result);
     });
@@ -658,15 +694,59 @@ function Post({
   );
 }
 
-function Profile({
-  uid,
-  showProfile,
-  user,
-  currentUser,
-  updateUser,
-  setShowAlert,
-}: any) {
+function Profile({ userProps, appProps }: any) {
   const [userInfo, setUserInfo] = useState(usernameStructure);
+  const { user, currentUser, updateUser, uid } = userProps;
+  const { showProfile, setShowAlert, setPostToDelete, setGiveChoice } =
+    appProps;
+  const [editPofile, setEditProfile] = useState(false);
+  const [newProfilePic, setNewProfilePic] = useState<File | null>(null);
+  const [resizedPic, setResizedPic] = useState<
+    string | File | null | Blob | ProgressEvent<FileReader>
+  >(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  function handleClick() {
+    inputRef.current?.click();
+  }
+
+  function handleChangePic(e: ChangeEvent<HTMLInputElement>) {
+    if (e.target.files) {
+      const image = (e.target as HTMLInputElement).files![0];
+      setNewProfilePic(image);
+    }
+  }
+
+  async function changeProfilePic() {
+    const refFullPic = ref(storage, `profile-pics/full/${currentUser.uid}`);
+    const refSmallPic = ref(storage, `profile-pics/small/${currentUser.uid}`);
+    if (newProfilePic) {
+      try {
+        //delete the old ones
+        await deleteObject(refFullPic);
+        await deleteObject(refSmallPic);
+        //upload new one
+        await uploadBytes(refFullPic, newProfilePic as File);
+        const smallPic = await resizePic(newProfilePic);
+        //upload the smaller one
+        await uploadBytes(refSmallPic, smallPic as File);
+      } catch (error) {
+        //on error delete profile pic and display an alert
+        console.log(JSON.stringify(error));
+        setShowAlert({
+          showAlert: true,
+          alertMessage: "error: " + JSON.stringify(error),
+        });
+        deleteObject(refFullPic);
+        deleteObject(refSmallPic);
+      } finally {
+        setShowAlert({
+          showAlert: true,
+          alertMessage: "",
+        });
+      }
+    }
+  }
+
   //make a query for all posts
   const q = query(
     postsRef,
@@ -675,15 +755,69 @@ function Profile({
     orderBy("createdAt", "desc")
   );
   const [posts, loading, error] = useCollection(q);
-  getUserInfo(uid).then((result) => {
-    setUserInfo(result);
-  });
+  //get user info on mount:
+  useEffect(() => {
+    //DEBUG
+    console.log("Profile mounted!");
+    getUserInfo(uid).then((result) => {
+      setUserInfo(result);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (newProfilePic) {
+      resizePic(newProfilePic).then((result) => {
+        setResizedPic(result);
+      });
+    }
+  }, [newProfilePic]);
 
   return (
     <>
-      <h1>
-        {userInfo.displayName != "" ? userInfo.displayName + "'s profile" : ""}
-      </h1>
+      <div className="profile">
+        <img
+          draggable={false}
+          src={userInfo.photoURL}
+          alt={userInfo.displayName + "'s profile picture"}
+        ></img>
+        <h1>{userInfo.displayName}</h1>
+        {userInfo.uid == currentUser.uid && (
+          <>
+            <button onClick={() => setEditProfile(true)}>Edit</button>
+          </>
+        )}
+      </div>
+      {editPofile && (
+        <>
+          <div className="edit info">
+            <button className="close-btn" onClick={() => setEditProfile(false)}>
+              <FontAwesomeIcon className="close" icon={faPlus} />
+            </button>
+            <input
+              type="file"
+              accept="image/*"
+              ref={inputRef}
+              onChange={handleChangePic}
+              style={{ display: "none" }}
+            ></input>
+            <img
+              draggable={false}
+              src={
+                newProfilePic
+                  ? window.URL.createObjectURL(newProfilePic)
+                  : currentUser.photoURL
+              }
+              alt={currentUser.displayName + "'s profile picture"}
+              onClick={handleClick}
+            ></img>
+            {resizedPic && (
+              <>
+                <img src={resizedPic as string}></img>
+              </>
+            )}
+          </div>
+        </>
+      )}
       {error && <h2>Error: can't load content</h2>}
       {loading && <h2>Loading...</h2>}
       <div className="gallery">
@@ -691,13 +825,21 @@ function Profile({
           posts.docs.map((post) => (
             <Post
               key={post.id}
-              post={post.data()}
-              showProfile={showProfile}
-              user={user}
-              postId={post.id}
-              currentUser={currentUser}
-              updateUser={updateUser}
-              setShowAlert={setShowAlert}
+              postProps={{
+                post: post.data(),
+                postId: post.id,
+              }}
+              userProps={{
+                user,
+                currentUser,
+                updateUser,
+              }}
+              appProps={{
+                showProfile,
+                setShowAlert,
+                setPostToDelete,
+                setGiveChoice,
+              }}
             />
           ))}
       </div>
