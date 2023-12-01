@@ -145,27 +145,31 @@ function App() {
     alertMessage: "",
   });
   const [giveChoice, setGiveChoice] = useState(false);
-  const [postToDelete, setPostToDelete] = useState("");
-  function handleDelete(confirmed: boolean) {
+  const [postToDelete, setPostToDelete] = useState({ postId: "", postURL: "" });
+  async function handleDelete(confirmed: boolean) {
     //alert to ask for confirmation
     if (confirmed) {
       if (user) {
-        console.log("delete post: " + postToDelete);
-        deleteDoc(doc(db, "posts", postToDelete))
-          .then(() => {
-            setShowAlert({
-              showAlert: true,
-              alertMessage: "Post Succesfully deleted",
-            });
-            setGiveChoice(false);
-            setPostToDelete("");
-          })
-          .catch((error) => {
-            setShowAlert({
-              showAlert: true,
-              alertMessage: "Error: " + JSON.stringify(error),
-            });
+        try {
+          console.log("delete post: " + postToDelete);
+          await deleteDoc(doc(db, "posts", postToDelete.postId));
+          const refToDelete = ref(storage, postToDelete.postURL);
+          console.log("URL: " + postToDelete.postURL);
+          await deleteObject(refToDelete).catch((e) =>
+            console.log(JSON.stringify(e))
+          );
+          setShowAlert({
+            showAlert: true,
+            alertMessage: "Post Succesfully deleted",
           });
+          setGiveChoice(false);
+          setPostToDelete({ postId: "", postURL: "" });
+        } catch (e) {
+          setShowAlert({
+            showAlert: true,
+            alertMessage: "Error: " + JSON.stringify(e),
+          });
+        }
       } else {
         setGiveChoice(false);
         setShowAlert({
@@ -197,7 +201,7 @@ function App() {
   }, [user]);
 
   useEffect(() => {
-    if (currentUser.followList.length > 0) {
+    if (currentUser.followList.length > 1) {
       setFilter("follow");
     } else {
       setFilter("all");
@@ -368,14 +372,20 @@ function App() {
       {showUserMenu && (
         <div id="dropdown-menu">
           <div>{user ? <SignOut /> : <SignIn updateUser={updateUser} />}</div>
-          <button>Profile</button>
-          <button
-            onClick={() => {
-              setShowUserOptions(true);
-            }}
-          >
-            Account Options
-          </button>
+          {user && (
+            <>
+              <button onClick={() => showProfile(currentUser.uid)}>
+                Profile
+              </button>
+              <button
+                onClick={() => {
+                  setShowUserOptions(true);
+                }}
+              >
+                Account Options
+              </button>
+            </>
+          )}
         </div>
       )}
       {display == "home" && (
@@ -551,7 +561,6 @@ function Gallery({ userProps, appProps }: any) {
     console.log("Gallery mounted");
   }, []);
   const [posts, loading, error] = useCollection(getQuery());
-  console.log("posts empty? " + posts?.empty);
   return (
     <>
       {error && <h2>Error: {JSON.stringify(error)}</h2>}
@@ -597,7 +606,7 @@ function Post({ postProps, userProps, appProps }: any) {
   //get user info on mount:
   useEffect(() => {
     //DEBUG
-    console.log("Post mounted");
+    // console.log("Post mounted");
     getUserInfo(post.uid).then((result) => {
       setAuthor(result);
     });
@@ -672,6 +681,7 @@ function Post({ postProps, userProps, appProps }: any) {
               className="close-btn"
               onClick={() => {
                 setPostToDelete(postId);
+                setPostToDelete({ postId, postURL: post.postUrl });
                 setGiveChoice(true);
                 setShowAlert({
                   showAlert: true,
