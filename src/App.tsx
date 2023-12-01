@@ -67,20 +67,31 @@ async function getUserInfo(id: string) {
   let docId = "";
   let followList: string[] = [];
   if (id) {
-    const q = query(usersRef, where("uid", "==", uid));
-    await getDocs(q).then((userInfo) => {
-      displayName = userInfo.docs[0].data().displayName;
-      smallPic = userInfo.docs[0].data().smallPic;
-      fullPic = userInfo.docs[0].data().fullPic;
-      followList = userInfo.docs[0].data().followList;
-      docId = userInfo.docs[0].id;
-    });
-    if (!smallPic) {
-      //use the default profile pic
-      const refDefaultPic = ref(storage, `profile-pics/default/black.png`);
-      const url = await getDownloadURL(refDefaultPic);
-      smallPic = url;
-      fullPic = url;
+    try {
+      const q = query(usersRef, where("uid", "==", uid));
+      const userInfo = await getDocs(q);
+      if (!userInfo.empty) {
+        displayName = userInfo.docs[0].data().displayName;
+        smallPic = userInfo.docs[0].data().smallPic;
+        fullPic = userInfo.docs[0].data().fullPic;
+        followList = userInfo.docs[0].data().followList;
+        docId = userInfo.docs[0].id;
+      }
+      if (!smallPic) {
+        //use the default profile pic
+        const refDefaultPic = ref(storage, `profile-pics/default/black.png`);
+        try {
+          const url = await getDownloadURL(refDefaultPic);
+          smallPic = url;
+          fullPic = url;
+        } catch (error) {
+          //DEBUG
+          console.log(JSON.stringify(error));
+        }
+      }
+    } catch (error) {
+      //DEBUG
+      console.log(JSON.stringify(error));
     }
   }
   return {
@@ -107,9 +118,7 @@ async function resizePic(
       (uri) => {
         resolve(uri);
       },
-      "base64",
-      20,
-      20
+      "base64"
     );
   });
 }
@@ -174,8 +183,10 @@ function App() {
   }
 
   function updateUser() {
-    if (user) {
+    console.log("updateUser called");
+    if (auth.currentUser) {
       getUserInfo(auth.currentUser!.uid).then((result) => {
+        console.log("setCurrentUser Called");
         setCurrentUser(result);
       });
     }
@@ -188,8 +199,10 @@ function App() {
   useEffect(() => {
     if (currentUser.followList.length > 0) {
       setFilter("follow");
+    } else {
+      setFilter("all");
     }
-  }, [currentUser]);
+  }, [currentUser, user]);
 
   async function changeUsername(e: React.FormEvent) {
     e.preventDefault();
@@ -203,19 +216,23 @@ function App() {
 
       //DEBUG
       console.log("getDocs called");
-      const snapshot = await getDocs(q);
-      const newUserRef = doc(db, "users", snapshot.docs[0].id);
-      //DEBUG
-      console.log("updateDoc called");
-      await updateDoc(newUserRef, {
-        displayName: newUsername,
-      }).then(() => {
-        updateUser();
-        setNewUserInfo({
-          state: "success",
-          value: newUsername + " is your new username",
+      try {
+        const snapshot = await getDocs(q);
+        const newUserRef = doc(db, "users", snapshot.docs[0].id);
+        //DEBUG
+        console.log("updateDoc called");
+        await updateDoc(newUserRef, {
+          displayName: newUsername,
+        }).then(() => {
+          updateUser();
+          setNewUserInfo({
+            state: "success",
+            value: newUsername + " is your new username",
+          });
         });
-      });
+      } catch (e) {
+        console.log(JSON.stringify(e));
+      }
     }
   }
 
@@ -350,7 +367,7 @@ function App() {
       )}
       {showUserMenu && (
         <div id="dropdown-menu">
-          <div>{user ? <SignOut /> : <SignIn />}</div>
+          <div>{user ? <SignOut /> : <SignIn updateUser={updateUser} />}</div>
           <button>Profile</button>
           <button
             onClick={() => {
@@ -415,7 +432,7 @@ function App() {
                       </h2>
                       <p>You need to be signed in to upload content</p>
                       <div className="sign-in-wrapper">
-                        <SignIn />
+                        <SignIn updateUser={updateUser} />
                       </div>
                     </div>
                   </>
@@ -433,6 +450,7 @@ function App() {
               showProfile,
               setShowAlert,
               filter,
+              setFilter,
               setPostToDelete,
               setGiveChoice,
             }}
@@ -508,10 +526,16 @@ function App() {
 
 function Gallery({ userProps, appProps }: any) {
   const { user, currentUser, updateUser } = userProps;
-  const { showProfile, setShowAlert, filter, setPostToDelete, setGiveChoice } =
-    appProps;
+  const {
+    showProfile,
+    setShowAlert,
+    filter,
+    setFilter,
+    setPostToDelete,
+    setGiveChoice,
+  } = appProps;
   function getQuery() {
-    if (filter == "follow") {
+    if (filter == "follow" && currentUser.followList.length > 0) {
       return query(
         postsRef,
         limit(3),
@@ -527,6 +551,7 @@ function Gallery({ userProps, appProps }: any) {
     console.log("Gallery mounted");
   }, []);
   const [posts, loading, error] = useCollection(getQuery());
+  console.log("posts empty? " + posts?.empty);
   return (
     <>
       {error && <h2>Error: {JSON.stringify(error)}</h2>}
@@ -856,60 +881,98 @@ function Profile({ userProps, appProps }: any) {
   );
 }
 
-function SignIn() {
-  const signInWithGoogle = () => {
+function SignIn({ updateUser }: SignInProps) {
+  async function signInWithGoogle() {
     const provider = new GoogleAuthProvider();
-    signInWithPopup(auth, provider).then(() => {
-      const { uid, photoURL, displayName } = auth.currentUser as UserLogin;
+    provider.setCustomParameters({
+      prompt: "select_account",
+    });
+    try {
+      await signInWithPopup(auth, provider);
+      const { uid, displayName } = auth.currentUser as UserLogin;
       const q = query(usersRef, where("uid", "==", uid));
-      async function checkUserData() {
-        //DEBUG
-        console.log("getDocs called (checkUserData)");
-        const userSnap = await getDocs(q);
-        //after sign in check if user is in the user collection, otherwise create a
-        //new user
-        if (userSnap.empty) {
-          //DEBUG
-          console.log("addDoc called");
+
+      //DEBUG
+      console.log("getDocs called (checkUserData)");
+      const userSnap = await getDocs(q);
+      //after sign in check if user is in the user collection, otherwise create a
+      //new user
+
+      if (userSnap.empty) {
+        try {
           //use the default profile pic
           const refDefaultPic = ref(storage, `profile-pics/default/black.png`);
           const url = await getDownloadURL(refDefaultPic);
           const smallPic = url;
           const fullPic = url;
-          addDoc(usersRef, {
+
+          //
+          //check if displayName is available otherwise keep trying to add a number until it is
+          //
+
+          let available = false;
+          let nameToCheck = displayName;
+          let digit = 0;
+          while (!available) {
+            nameToCheck = digit == 0 ? displayName : displayName + digit;
+            const queryUsername = query(
+              usersRef,
+              where("displayName", "==", nameToCheck)
+            );
+            try {
+              const snapshot = await getDocs(queryUsername);
+              if (!snapshot.empty) {
+                console.log(
+                  "not available for " + nameToCheck + ", next try..."
+                );
+                digit++;
+              } else {
+                console.log("available for" + nameToCheck);
+                available = true;
+              }
+            } catch (error) {
+              //DEBUG
+              console.log(JSON.stringify(error));
+            }
+          }
+
+          //DEBUG
+          console.log("addDoc called");
+          await addDoc(usersRef, {
             uid,
             smallPic,
             fullPic,
-            displayName,
-            followList: [],
+            displayName: nameToCheck,
+            followList: [uid],
           });
-        } else {
-          console.log("user already in db");
-          if (!userSnap.docs[0].data().smallPic) {
-            console.log("no profile pic found, assignign the default one...");
-            const refDefaultPic = ref(
-              storage,
-              `profile-pics/default/black.png`
-            );
-            const url = await getDownloadURL(refDefaultPic);
-            const smallPic = url;
-            const fullPic = url;
-            const userRef = doc(db, "users", userSnap.docs[0].id);
-            await updateDoc(userRef, {
-              smallPic: url,
-              fullPic: url,
-            });
-          }
+          console.log("addDoc resolved, trying to get the user info: ");
+          const queryToTest = query(usersRef, where("uid", "==", uid));
+          const snappy = await getDocs(queryToTest);
+          console.log(snappy.docs[0].data());
+          console.log("now, update user will be called: ");
+          updateUser();
+        } catch (error) {
+          //DEBUG
+          console.log(JSON.stringify(error));
         }
+      } else {
+        console.log("user already in db");
       }
-      checkUserData();
-    });
-  };
+    } catch (error) {
+      //DEBUG
+      console.log(JSON.stringify(error));
+    }
+  }
   return <button onClick={signInWithGoogle}>Sign in with Google</button>;
 }
 
 function SignOut() {
-  return <button onClick={() => auth.signOut()}>Sign Out</button>;
+  function handleSignOut() {
+    auth.signOut().then(() => {
+      console.log("succesfully signed out");
+    });
+  }
+  return <button onClick={handleSignOut}>Sign Out</button>;
 }
 
 export default App;

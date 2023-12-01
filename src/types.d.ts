@@ -11,3 +11,6 @@ type User = {
   followList: string[];
   docId: string;
 };
+type SignInProps = {
+  updateUser: () => void;
+};

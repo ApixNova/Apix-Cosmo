@@ -379,6 +379,7 @@ header img {
   height: 50px;
   border-radius: 47%;
   margin: 5px;
+  border: 2px solid rgb(179, 61, 61);
 }
 .username {
   margin-left: 10px;
