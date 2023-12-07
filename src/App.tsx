@@ -20,6 +20,10 @@ import {
   getDocs,
   arrayUnion,
   deleteDoc,
+  startAfter,
+  QueryDocumentSnapshot,
+  DocumentData,
+  arrayRemove,
 } from "firebase/firestore";
 import { v4 } from "uuid";
 
@@ -110,15 +114,33 @@ async function resizePic(
   return new Promise((resolve) => {
     Resizer.imageFileResizer(
       file,
-      48,
-      48,
+      70,
+      70,
       "JPEG",
       100,
       0,
       (uri) => {
         resolve(uri);
       },
-      "base64"
+      "file"
+    );
+  });
+}
+async function resizeFullPic(
+  file: File
+): Promise<string | File | Blob | ProgressEvent<FileReader>> {
+  return new Promise((resolve) => {
+    Resizer.imageFileResizer(
+      file,
+      500,
+      500,
+      "JPEG",
+      100,
+      0,
+      (uri) => {
+        resolve(uri);
+      },
+      "file"
     );
   });
 }
@@ -134,7 +156,6 @@ function App() {
   const [showUserOptions, setShowUserOptions] = useState(false);
   const [currentUser, setCurrentUser] = useState(usernameStructure);
   const [newUsername, setNewName] = useState("");
-  //filter for the gallery: "all" or "follow"
   const [filter, setFilter] = useState("all");
   const [newUserInfo, setNewUserInfo] = useState({
     state: "false",
@@ -460,7 +481,6 @@ function App() {
               showProfile,
               setShowAlert,
               filter,
-              setFilter,
               setPostToDelete,
               setGiveChoice,
             }}
@@ -536,19 +556,26 @@ function App() {
 
 function Gallery({ userProps, appProps }: any) {
   const { user, currentUser, updateUser } = userProps;
-  const {
-    showProfile,
-    setShowAlert,
-    filter,
-    setFilter,
-    setPostToDelete,
-    setGiveChoice,
-  } = appProps;
+  const { showProfile, setShowAlert, filter, setPostToDelete, setGiveChoice } =
+    appProps;
+  //max number of posts to fetch per batch
+  const postLimit = 3;
+
+  async function getCurrentData(): Promise<
+    QueryDocumentSnapshot<DocumentData, DocumentData>[]
+  > {
+    return new Promise((resolve) => {
+      setMorePosts((current) => {
+        resolve(current);
+        return current;
+      });
+    });
+  }
   function getQuery() {
     if (filter == "follow" && currentUser.followList.length > 0) {
       return query(
         postsRef,
-        limit(3),
+        limit(postLimit),
         orderBy("createdAt", "desc"),
         where("uid", "in", currentUser.followList)
       );
@@ -556,37 +583,135 @@ function Gallery({ userProps, appProps }: any) {
       return query(postsRef, limit(3), orderBy("createdAt", "desc"));
     }
   }
+
+  const [morePosts, setMorePosts] = useState<
+    QueryDocumentSnapshot<DocumentData, DocumentData>[]
+  >([]);
+
+  async function getMorePosts() {
+    const currentData = await getCurrentData();
+    const queryMore = query(
+      postsRef,
+      limit(postLimit),
+      orderBy("createdAt", "desc"),
+      startAfter(currentData[currentData.length - 1].data().createdAt)
+    );
+    return await getDocs(queryMore);
+  }
+  const [isLoading, setIsLoading] = useState(false);
+  const [allShown, setAllShown] = useState(false);
+  const allShownRef = useRef(allShown);
+  const [error, setError] = useState({
+    state: false,
+    text: "",
+  });
+
+  function handleScroll() {
+    if (
+      window.innerHeight + document.documentElement.scrollTop + 200 <=
+        document.documentElement.offsetHeight ||
+      allShownRef.current ||
+      isLoading
+    ) {
+      return;
+    }
+    allShownRef.current = true;
+    console.log("You've hit rock bottom ;)");
+    fetchMorePosts();
+  }
+
+  async function fetchMorePosts() {
+    const currentData = await getCurrentData();
+    if (currentData.length > 0) {
+      setIsLoading(true);
+      getMorePosts()
+        .then((data) => {
+          if (data.docs.length < postLimit || data.empty) {
+            console.log("that was the last batch");
+            setAllShown(true);
+            allShownRef.current = true;
+          } else {
+            allShownRef.current = false;
+          }
+          setMorePosts((prev) => {
+            return prev.concat(data.docs);
+          });
+          setIsLoading(false);
+        })
+        .catch((e) => {
+          setError({
+            state: true,
+            text: JSON.stringify(e),
+          });
+        });
+    }
+  }
+
+  function getFirstBatch() {
+    setIsLoading(true);
+    getDocs(getQuery())
+      .then((data) => {
+        setMorePosts(data.docs);
+        setIsLoading(false);
+        if (data.docs.length < postLimit || data.empty) {
+          setAllShown(true);
+        }
+      })
+      .catch((e) => {
+        setError({
+          state: true,
+          text: JSON.stringify(e),
+        });
+      });
+  }
+
   useEffect(() => {
     //DEBUG
     console.log("Gallery mounted");
+    getFirstBatch();
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-  const [posts, loading, error] = useCollection(getQuery());
+
+  useEffect(() => {
+    getFirstBatch();
+    setAllShown(false);
+    allShownRef.current = false;
+  }, [filter]);
   return (
     <>
-      {error && <h2>Error: {JSON.stringify(error)}</h2>}
-      {loading && <h2>Loading...</h2>}
-      <div className="gallery">
-        {posts &&
-          posts.docs.map((post) => (
-            <Post
-              key={post.id}
-              postProps={{
-                post: post.data(),
-                postId: post.id,
-              }}
-              userProps={{
-                user,
-                currentUser,
-                updateUser,
-              }}
-              appProps={{
-                showProfile,
-                setShowAlert,
-                setPostToDelete,
-                setGiveChoice,
-              }}
-            />
-          ))}
+      <div className="display">
+        {error.state && <h2>Error: {error.text}</h2>}
+        {morePosts.length == 0 && allShown && <h2>Nothing here yet</h2>}
+        <div className="gallery">
+          {morePosts.length > 0 &&
+            morePosts.map((post) => (
+              <Post
+                key={post.id}
+                postProps={{
+                  post: post.data(),
+                  postId: post.id,
+                }}
+                userProps={{
+                  user,
+                  currentUser,
+                  updateUser,
+                }}
+                appProps={{
+                  showProfile,
+                  setShowAlert,
+                  setPostToDelete,
+                  setGiveChoice,
+                }}
+              />
+            ))}
+        </div>
+        {isLoading && (
+          <div>
+            <h1>Loading...</h1>
+          </div>
+        )}
+        {allShown && <div className="footer"></div>}
       </div>
     </>
   );
@@ -601,6 +726,7 @@ function Post({ postProps, userProps, appProps }: any) {
   const [text, setText] = useState(post.text?.slice(0, 137));
   const [showAll, setShowAll] = useState(false);
   const [author, setAuthor] = useState(usernameStructure);
+  const [loading, setLoading] = useState(true);
   const uid = auth.currentUser?.uid;
 
   //get user info on mount:
@@ -664,7 +790,7 @@ function Post({ postProps, userProps, appProps }: any) {
   }
   return (
     <>
-      <div className="post">
+      <div className="post" style={{ display: loading ? "none" : "block" }}>
         <div className="author">
           <div className="show-profile" onClick={() => showProfile(post.uid)}>
             <img src={author.smallPic} className="profile-pic"></img>
@@ -693,7 +819,11 @@ function Post({ postProps, userProps, appProps }: any) {
             </button>
           )}
         </div>
-        <img className="post-image" src={post.postUrl}></img>
+        <img
+          className="post-image"
+          src={post.postUrl}
+          onLoad={() => setLoading(false)}
+        ></img>
         {post.text && post.text.length <= 137 ? (
           <p className="post-text">{post.text}</p>
         ) : (
@@ -745,9 +875,6 @@ function Profile({ userProps, appProps }: any) {
     appProps;
   const [editPofile, setEditProfile] = useState(false);
   const [newProfilePic, setNewProfilePic] = useState<File | null>(null);
-  const [resizedPic, setResizedPic] = useState<
-    string | File | null | Blob | ProgressEvent<FileReader>
-  >(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   function handleClick() {
     inputRef.current?.click();
@@ -765,27 +892,32 @@ function Profile({ userProps, appProps }: any) {
     const refSmallPic = ref(storage, `profile-pics/small/${currentUser.uid}`);
     if (newProfilePic) {
       try {
-        //delete the old ones
-        await deleteObject(refFullPic);
-        await deleteObject(refSmallPic);
+        setShowAlert({
+          showAlert: true,
+          alertMessage: "Loading...",
+        });
         //upload new one
-        await uploadBytes(refFullPic, newProfilePic as File);
+        const fullPic = await resizeFullPic(newProfilePic);
+        await uploadBytes(refFullPic, fullPic as File);
         const smallPic = await resizePic(newProfilePic);
         //upload the smaller one
         await uploadBytes(refSmallPic, smallPic as File);
+        const userRef = doc(db, "users", currentUser.docId);
+        const smallURL = await getDownloadURL(refSmallPic);
+        const fullURL = await getDownloadURL(refFullPic);
+        await updateDoc(userRef, {
+          smallPic: smallURL,
+          fullPic: fullURL,
+        });
+        setShowAlert({
+          showAlert: true,
+          alertMessage: "New Profile Picture Set!",
+        });
       } catch (error) {
-        //on error delete profile pic and display an alert
-        console.log(JSON.stringify(error));
+        //on error display an alert
         setShowAlert({
           showAlert: true,
           alertMessage: "error: " + JSON.stringify(error),
-        });
-        deleteObject(refFullPic);
-        deleteObject(refSmallPic);
-      } finally {
-        setShowAlert({
-          showAlert: true,
-          alertMessage: "",
         });
       }
     }
@@ -808,13 +940,18 @@ function Profile({ userProps, appProps }: any) {
     });
   }, []);
 
-  useEffect(() => {
-    if (newProfilePic) {
-      resizePic(newProfilePic).then((result) => {
-        setResizedPic(result);
+  function handleUnfollow() {
+    const userRef = doc(db, "users", currentUser.docId);
+    updateDoc(userRef, {
+      followList: arrayRemove(userInfo.uid),
+    })
+      .then(() => {
+        updateUser();
+      })
+      .catch((e) => {
+        console.log(JSON.stringify(e));
       });
-    }
-  }, [newProfilePic]);
+  }
 
   return (
     <>
@@ -830,6 +967,12 @@ function Profile({ userProps, appProps }: any) {
             <button onClick={() => setEditProfile(true)}>Edit</button>
           </>
         )}
+        {currentUser.followList.includes(userInfo.uid) &&
+          currentUser.uid != userInfo.uid && (
+            <>
+              <button onClick={handleUnfollow}>Unfollow</button>
+            </>
+          )}
       </div>
       {editPofile && (
         <>
@@ -854,9 +997,10 @@ function Profile({ userProps, appProps }: any) {
               alt={currentUser.displayName + "'s profile picture"}
               onClick={handleClick}
             ></img>
-            {resizedPic && (
+            <h2>Update Profile Picture</h2>
+            {newProfilePic && (
               <>
-                <img src={resizedPic as string}></img>
+                <button onClick={changeProfilePic}>Submit</button>
               </>
             )}
           </div>
