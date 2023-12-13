@@ -71,7 +71,19 @@ header h1 {
   z-index: 1;
 }
 #dropdown-menu button {
-  margin: auto;
+  background: inherit;
+  width: 100%;
+  border: 2px solid rgb(190, 45, 81);
+}
+#dropdown-menu button:hover {
+  background: inherit;
+  border: 2px solid rgb(190, 150, 150);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(204, 132, 200, 0.24),
+    transparent
+  );
 }
 @keyframes dropdown {
   0% {
@@ -275,26 +287,6 @@ header img {
 .sign-in-wrapper button {
   margin: auto;
 }
-.gallery {
-  margin: auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
-  justify-content: space-evenly;
-  width: auto;
-}
-.gallery::after {
-  content: "";
-  flex-basis: 600px;
-}
-.post {
-  background: black;
-  border: 1px solid white;
-  display: flex;
-  flex-direction: column;
-  width: 90vw;
-  max-width: 600px;
-}
 /* Delete Post Confirmation */
 .choice {
   margin: auto auto 10px auto;
@@ -309,53 +301,8 @@ header img {
 .deny {
   border: 1px solid white;
 }
-.post-text {
-  margin-left: 7px;
-  margin-right: 7px;
-  text-align: justify;
-}
-.show-more {
-  display: inline-block;
-  margin-top: 0;
-  margin-left: 5px;
-  color: gray;
-}
-#like {
-  display: flex;
-  align-items: center;
-  margin-left: 20px;
-  gap: 10px;
-}
-.follow {
-  margin: auto 10px auto auto;
-}
-#like p {
-  font-family: "Space Grotesk", sans-serif;
-}
-.heart {
-  font-size: 1.7em;
-  color: rgb(223, 46, 55);
-}
-.pulse {
-  animation: 200ms pulse;
-}
-.author {
-  display: flex;
-  justify-content: space-between;
-  /* width: fit-content; */
-  font-family: "Space Grotesk", sans-serif;
-  font-size: 18px;
-}
-.show-profile {
-  display: flex;
-  padding-right: 10px;
-  user-select: none;
-  cursor: pointer;
-}
 .profile {
-  background: #7599b8;
-  background: radial-gradient(#7599b825, transparent);
-  background: radial-gradient(#130c0c25 50%, #7599b825);
+  background: radial-gradient(#130c0c25 50%, #a575b825);
   border: 2px solid rgb(177, 56, 86);
   border-radius: 20px;
   width: 80%;
@@ -375,22 +322,6 @@ header img {
 }
 .profile button {
   margin-bottom: 20px;
-}
-.profile-pic {
-  object-fit: cover;
-  width: 50px;
-  height: 50px;
-  border-radius: 47%;
-  margin: 5px;
-  border: 2px solid rgb(252, 248, 248);
-}
-.username {
-  margin-left: 10px;
-}
-.post-image {
-  width: 100%;
-  margin: auto;
-  object-fit: contain;
 }
 .alert {
   width: 350px;
@@ -448,7 +379,7 @@ header img {
 }
 .footer {
   width: 100%;
-  height: 100px;
+  height: 50px;
   margin-top: auto;
   background: black;
   border-top: 3px solid white;
@@ -458,14 +389,68 @@ header img {
   flex-direction: column;
   height: 100%;
 }
-.posts-state {
-  font-family: "Space Grotesk", sans-serif;
-}
 .main-pic {
   width: 80%;
-  max-width: 500px;
+  max-width: 440px;
   margin: auto;
   box-shadow: rgba(153, 44, 44, 0.329) 0px 54px 55px,
     rgba(70, 33, 172, 0.37) 0px -12px 30px, rgba(184, 32, 32, 0.12) 0px 4px 6px,
     rgba(235, 7, 204, 0.17) 0px 12px 13px, rgba(61, 90, 185, 0.09) 0px -3px 5px;
+}
+.content {
+  margin-bottom: 20px;
+  height: 100%;
+  flex: 1;
+}
+.welcome {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  height: calc(100% - 73px);
+}
+.welcome h2 {
+  font-family: "Space Grotesk", sans-serif;
+}
+.welcome h2 span:nth-child(1) {
+  color: rgb(210, 214, 235);
+}
+.welcome h2 span:nth-child(2) {
+  color: rgb(223, 188, 206);
+}
+.welcome button {
+  margin: auto;
+  font-size: 1.2em;
+  border: 2px solid rgb(190, 45, 81);
+  background: linear-gradient(rgba(117, 153, 184, 0.308), transparent);
+}
+.welcome-images {
+  display: flex;
+  align-content: center;
+  margin: auto;
+}
+.welcome-images .main-pic {
+  margin: inherit;
+}
+.star-pattern {
+  width: 300px;
+  height: 300px;
+  margin: auto;
+}
+@media screen and (max-width: 1200px) {
+  .star-pattern {
+    display: none;
+  }
+}
+.welcome svg {
+  vertical-align: middle;
+}
+.about {
+  font-size: 1.4em;
+  font-family: "Space Grotesk", sans-serif;
+  min-height: inherit;
+  gap: inherit;
+}
+.about span {
+  color: rgb(190, 45, 81);
+  font-weight: bold;
 }

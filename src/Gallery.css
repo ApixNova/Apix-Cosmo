@@ -1,0 +1,81 @@
+.gallery {
+  margin: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: space-evenly;
+  width: auto;
+}
+.gallery::after {
+  content: "";
+  flex-basis: 600px;
+}
+.post {
+  background: black;
+  border: 1px solid white;
+  display: flex;
+  flex-direction: column;
+  width: 90vw;
+  max-width: 600px;
+}
+.posts-state {
+  font-family: "Space Grotesk", sans-serif;
+}
+.author {
+  display: flex;
+  justify-content: space-between;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 18px;
+}
+.show-profile {
+  display: flex;
+  padding-right: 10px;
+  user-select: none;
+  cursor: pointer;
+}
+.profile-pic {
+  object-fit: cover;
+  width: 50px;
+  height: 50px;
+  border-radius: 47%;
+  margin: 5px;
+  /* border: 2px solid rgb(252, 248, 248); */
+}
+.username {
+  margin-left: 10px;
+}
+.post-image {
+  width: 100%;
+  margin: auto;
+  object-fit: contain;
+}
+.post-text {
+  margin-left: 7px;
+  margin-right: 7px;
+  text-align: justify;
+}
+.show-more {
+  display: inline-block;
+  margin-top: 0;
+  margin-left: 5px;
+  color: gray;
+}
+#like {
+  display: flex;
+  align-items: center;
+  margin-left: 20px;
+  gap: 10px;
+}
+.follow {
+  margin: auto 10px auto auto;
+}
+#like p {
+  font-family: "Space Grotesk", sans-serif;
+}
+.heart {
+  font-size: 1.7em;
+  color: rgb(223, 46, 55);
+}
+.pulse {
+  animation: 200ms pulse;
+}

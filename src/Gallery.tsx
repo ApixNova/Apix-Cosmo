@@ -13,15 +13,14 @@ import { postsRef } from "./App";
 
 import Post from "./Post";
 
+import { mainPic } from "./App";
+
 export default function Gallery({ userProps, appProps, uid = "" }: any) {
   const { user, currentUser, updateUser } = userProps;
   const { showProfile, setShowAlert, filter, setPostToDelete, setGiveChoice } =
     appProps;
   //max number of posts to fetch per batch
   const postLimit = 3;
-
-  const mainPic =
-    "https://firebasestorage.googleapis.com/v0/b/apix-cosmo.appspot.com/o/public%2Fmain.jpg?alt=media&token=c0cfd097-a91d-492a-8f92-91b0bdeb4b86";
 
   async function getCurrentData(): Promise<
     QueryDocumentSnapshot<DocumentData, DocumentData>[]
@@ -55,19 +54,43 @@ export default function Gallery({ userProps, appProps, uid = "" }: any) {
       return query(postsRef, limit(postLimit), orderBy("createdAt", "desc"));
     }
   }
+  async function getMoreQuery() {
+    const currentData = await getCurrentData();
+    if (filter == "follow" && currentUser.followList.length > 0) {
+      console.log("follow filter");
+      return query(
+        postsRef,
+        limit(postLimit),
+        orderBy("createdAt", "desc"),
+        where("uid", "in", currentUser.followList),
+        startAfter(currentData[currentData.length - 1].data().createdAt)
+      );
+    } else if (filter == "profile") {
+      console.log("profile filter");
+      return query(
+        postsRef,
+        where("uid", "==", uid),
+        limit(postLimit),
+        orderBy("createdAt", "desc"),
+        startAfter(currentData[currentData.length - 1].data().createdAt)
+      );
+    } else {
+      console.log("all posts filter");
+      return query(
+        postsRef,
+        limit(postLimit),
+        orderBy("createdAt", "desc"),
+        startAfter(currentData[currentData.length - 1].data().createdAt)
+      );
+    }
+  }
 
   const [posts, setPosts] = useState<
     QueryDocumentSnapshot<DocumentData, DocumentData>[]
   >([]);
 
   async function getMorePosts() {
-    const currentData = await getCurrentData();
-    const queryMore = query(
-      postsRef,
-      limit(postLimit),
-      orderBy("createdAt", "desc"),
-      startAfter(currentData[currentData.length - 1].data().createdAt)
-    );
+    const queryMore = await getMoreQuery();
     return await getDocs(queryMore);
   }
   const [isLoading, setIsLoading] = useState(false);
@@ -80,7 +103,7 @@ export default function Gallery({ userProps, appProps, uid = "" }: any) {
 
   function handleScroll() {
     if (
-      window.innerHeight + document.documentElement.scrollTop + 200 <=
+      window.innerHeight + document.documentElement.scrollTop + 300 <=
         document.documentElement.offsetHeight ||
       allShownRef.current ||
       isLoading
@@ -88,7 +111,7 @@ export default function Gallery({ userProps, appProps, uid = "" }: any) {
       return;
     }
     allShownRef.current = true;
-    console.log("You've hit rock bottom ;)");
+    console.log("More content loading");
     fetchMorePosts();
   }
 
@@ -153,7 +176,7 @@ export default function Gallery({ userProps, appProps, uid = "" }: any) {
       {posts.length == 0 && allShown && (
         <>
           <h2 className="posts-state">Nothing here yet</h2>
-          <img className="main-pic" src={mainPic}></img>
+          <img className="main-pic" src={mainPic} draggable={false}></img>
         </>
       )}
       <div className="gallery">

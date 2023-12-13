@@ -38,23 +38,26 @@ export default function Post({ postProps, userProps, appProps }: any) {
     const postRef = doc(postsRef, postId);
 
     //if user is in the list
-    if (post.likedBy.includes(uid)) {
+    if (likedBy.includes(uid)) {
       //unlike post
-      const updatedList = post.likedBy.filter((id: String) => id != uid);
+      const updatedList = likedBy.filter((id: String) => id != uid);
       //DEBUG
       console.log("updateDoc called");
+      //test
+      setLikedBy(updatedList);
       await updateDoc(postRef, {
         likedBy: updatedList,
-      }).then(() => setLikedBy(updatedList));
+      });
     } else {
       //like post
-      const updatedList = post.likedBy;
-      updatedList.push(uid);
+      const updatedList = likedBy.concat([uid]);
       //DEBUG
       console.log("updateDoc called");
+      //test
+      setLikedBy(updatedList);
       await updateDoc(postRef, {
         likedBy: updatedList,
-      }).then(() => setLikedBy(updatedList));
+      });
     }
   }
   async function followUser() {
@@ -81,7 +84,7 @@ export default function Post({ postProps, userProps, appProps }: any) {
   }
   return (
     <>
-      <div className="post" style={{ display: loading ? "none" : "block" }}>
+      <div className="post" style={{ display: loading ? "none" : "flex" }}>
         <div className="author">
           <div className="show-profile" onClick={() => showProfile(post.uid)}>
             <img src={author.smallPic} className="profile-pic"></img>
@@ -152,7 +155,7 @@ export default function Post({ postProps, userProps, appProps }: any) {
               icon={faHeartRegular}
             />
           )}
-          <p>{post.likedBy.length}</p>
+          <p>{likedBy.length}</p>
         </div>
       </div>
     </>

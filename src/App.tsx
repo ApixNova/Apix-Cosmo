@@ -1,7 +1,10 @@
 import "./App.css";
+import "./Gallery.css";
 import Gallery from "./Gallery";
 import Profile from "./Profile";
 import person from "./assets/person.svg";
+import starPatternLeft from "./assets/star pattern left.png";
+import starPatternRight from "./assets/star pattern right.png";
 
 import { useState, useEffect } from "react";
 import { initializeApp } from "firebase/app";
@@ -22,7 +25,7 @@ import {
 import { v4 } from "uuid";
 
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faPlus } from "@fortawesome/free-solid-svg-icons";
+import { faPlus, faArrowRight } from "@fortawesome/free-solid-svg-icons";
 
 //to handle files
 import {
@@ -51,6 +54,9 @@ export const usernameStructure: User = {
   docId: "",
   followList: [],
 };
+
+export const mainPic =
+  "https://firebasestorage.googleapis.com/v0/b/apix-cosmo.appspot.com/o/public%2Fmain.jpg?alt=media&token=c0cfd097-a91d-492a-8f92-91b0bdeb4b86";
 
 export async function getUserInfo(id: string) {
   const uid = id;
@@ -104,6 +110,7 @@ function App() {
   const [profileId, setProfileId] = useState<String>("");
   const [text, setText] = useState("");
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
   const [showUserOptions, setShowUserOptions] = useState(false);
   const [currentUser, setCurrentUser] = useState(usernameStructure);
   const [newUsername, setNewName] = useState("");
@@ -178,10 +185,14 @@ function App() {
   }, [currentUser, user]);
 
   function setDefaultFilter() {
-    if (currentUser.followList.length > 1) {
-      setFilter("follow");
+    if (user) {
+      if (currentUser.followList.length > 1) {
+        setFilter("follow");
+      } else {
+        setFilter("all");
+      }
     } else {
-      setFilter("all");
+      setFilter("welcome");
     }
   }
 
@@ -202,6 +213,10 @@ function App() {
         const newUserRef = doc(db, "users", snapshot.docs[0].id);
         //DEBUG
         console.log("updateDoc called");
+        setNewUserInfo({
+          state: "true",
+          value: "Loading...",
+        });
         await updateDoc(newUserRef, {
           displayName: newUsername,
         }).then(() => {
@@ -223,8 +238,6 @@ function App() {
     //check if username available
     const q = query(usersRef, where("displayName", "==", newUsername));
     setNewUserInfo({ state: "false", value: "Loading..." });
-    //DEBUG
-    console.log("getDocs called (to check username availability");
     const snapshot = await getDocs(q);
     if (newUsername == "") {
       setNewUserInfo({
@@ -309,26 +322,7 @@ function App() {
             ></img>
           </div>
         </header>
-        {filter != "profile" && (
-          <div className="toggle">
-            <button
-              className={
-                (filter == "all" ? "" : " selected") + " toggle-btn left"
-              }
-              onClick={() => handleFilter()}
-            >
-              Follow List
-            </button>
-            <button
-              className={
-                (filter == "all" ? " selected" : "") + " toggle-btn right"
-              }
-              onClick={() => setFilter("all")}
-            >
-              All Posts
-            </button>
-          </div>
-        )}
+
         {showAlert.showAlert && (
           <div className="alert">
             <button
@@ -370,10 +364,29 @@ function App() {
                 </button>
               </>
             )}
+            <button onClick={() => setShowAbout(true)}>About Cosmo</button>
           </div>
         )}
-        {filter != "profile" && (
+        {["follow", "all"].includes(filter) && (
           <>
+            <div className="toggle">
+              <button
+                className={
+                  (filter == "all" ? "" : " selected") + " toggle-btn left"
+                }
+                onClick={() => handleFilter()}
+              >
+                Follow List
+              </button>
+              <button
+                className={
+                  (filter == "all" ? " selected" : "") + " toggle-btn right"
+                }
+                onClick={() => setFilter("all")}
+              >
+                All Posts
+              </button>
+            </div>
             <form id="submit-form" onSubmit={submit}>
               <button
                 id="new-post-button"
@@ -450,6 +463,33 @@ function App() {
             />
           </>
         )}
+        {filter == "welcome" && (
+          <div className="welcome">
+            <h2>
+              A <span>Space</span> To Share <span>Art</span>
+            </h2>
+            <div className="welcome-images">
+              <img
+                className="star-pattern"
+                src={starPatternLeft}
+                draggable={false}
+              ></img>
+              <img className="main-pic" src={mainPic} draggable={false}></img>
+              <img
+                className="star-pattern"
+                src={starPatternRight}
+                draggable={false}
+              ></img>
+            </div>
+            <button
+              onClick={() => {
+                setFilter("all");
+              }}
+            >
+              Explore <FontAwesomeIcon icon={faArrowRight} />
+            </button>
+          </div>
+        )}
         {showUserOptions && user && (
           <>
             <div className="background"></div>
@@ -494,6 +534,20 @@ function App() {
               </form>
             </div>
           </>
+        )}
+        {showAbout && (
+          <div className="edit about">
+            <button className="close-btn" onClick={() => setShowAbout(false)}>
+              <FontAwesomeIcon className="close" icon={faPlus} />
+            </button>
+            <div className="separation"></div>
+            <div className="about-text">
+              <p>
+                Cosmo is a social media for people to share art. Created by{" "}
+                <span>Apix Nova</span>
+              </p>
+            </div>
+          </div>
         )}
         {filter == "profile" && (
           <>
@@ -544,11 +598,7 @@ function SignIn({ updateUser }: SignInProps) {
           const url = await getDownloadURL(refDefaultPic);
           const smallPic = url;
           const fullPic = url;
-
-          //
           //check if displayName is available otherwise keep trying to add a number until it is
-          //
-
           let available = false;
           let nameToCheck = displayName;
           let digit = 0;
@@ -574,7 +624,6 @@ function SignIn({ updateUser }: SignInProps) {
               console.log(JSON.stringify(error));
             }
           }
-
           //DEBUG
           console.log("addDoc called");
           await addDoc(usersRef, {
