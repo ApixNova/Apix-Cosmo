@@ -13,12 +13,15 @@ import { postsRef } from "./App";
 
 import Post from "./Post";
 
-import { mainPic } from "./App";
+import mainPic from "./assets/main.jpg";
 
-export default function Gallery({ userProps, appProps, uid = "" }: any) {
+export default function Gallery({
+  userProps,
+  appProps,
+  uid = "",
+}: GalleryProps) {
   const { user, currentUser, updateUser } = userProps;
-  const { showProfile, setShowAlert, filter, setPostToDelete, setGiveChoice } =
-    appProps;
+  const { showProfile, setShowAlert, filter, setPostToDelete } = appProps;
   //max number of posts to fetch per batch
   const postLimit = 3;
 
@@ -197,7 +200,6 @@ export default function Gallery({ userProps, appProps, uid = "" }: any) {
                 showProfile,
                 setShowAlert,
                 setPostToDelete,
-                setGiveChoice,
               }}
             />
           ))}

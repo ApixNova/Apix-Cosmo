@@ -45,11 +45,16 @@ async function resizeFullPic(
   });
 }
 
-export default function Profile({ userProps, appProps }: any) {
+export default function Profile({ userProps, appProps }: ProfileProps) {
   const [userInfo, setUserInfo] = useState(usernameStructure);
   const { user, currentUser, updateUser, uid } = userProps;
-  const { showProfile, setShowAlert, setPostToDelete, setGiveChoice, filter } =
-    appProps;
+  const {
+    showProfile,
+    setShowAlert,
+    setShowUserOptions,
+    setPostToDelete,
+    filter,
+  } = appProps;
   const [editPofile, setEditProfile] = useState(false);
   const [newProfilePic, setNewProfilePic] = useState<File | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -71,6 +76,7 @@ export default function Profile({ userProps, appProps }: any) {
       try {
         setShowAlert({
           showAlert: true,
+          giveChoice: false,
           alertMessage: "Loading...",
         });
         //upload new one
@@ -88,12 +94,14 @@ export default function Profile({ userProps, appProps }: any) {
         });
         setShowAlert({
           showAlert: true,
+          giveChoice: false,
           alertMessage: "New Profile Picture Set!",
         });
       } catch (error) {
         //on error display an alert
         setShowAlert({
           showAlert: true,
+          giveChoice: false,
           alertMessage: "error: " + JSON.stringify(error),
         });
       }
@@ -144,7 +152,8 @@ export default function Profile({ userProps, appProps }: any) {
       </div>
       {editPofile && (
         <>
-          <div className="edit info">
+          <div className="background"></div>
+          <div className="user-options info">
             <button className="close-btn" onClick={() => setEditProfile(false)}>
               <FontAwesomeIcon className="close" icon={faPlus} />
             </button>
@@ -155,6 +164,11 @@ export default function Profile({ userProps, appProps }: any) {
               onChange={handleChangePic}
               style={{ display: "none" }}
             ></input>
+            <h2>
+              <span className="tiny">✦</span>Change Profile Picture
+              <span className="tiny">✦</span>
+            </h2>
+            <div className="separation"></div>
             <img
               draggable={false}
               src={
@@ -165,12 +179,22 @@ export default function Profile({ userProps, appProps }: any) {
               alt={currentUser.displayName + "'s profile picture"}
               onClick={handleClick}
             ></img>
-            <h2>Update Profile Picture</h2>
             {newProfilePic && (
               <>
-                <button onClick={changeProfilePic}>Submit</button>
+                <button onClick={changeProfilePic}>
+                  Update profile picture
+                </button>
               </>
             )}
+            <h3>{currentUser.displayName}</h3>
+            <button
+              onClick={() => {
+                setEditProfile(false);
+                setShowUserOptions(true);
+              }}
+            >
+              Change username
+            </button>
           </div>
         </>
       )}
@@ -185,7 +209,6 @@ export default function Profile({ userProps, appProps }: any) {
           setShowAlert,
           filter,
           setPostToDelete,
-          setGiveChoice,
         }}
         uid={uid}
       />

@@ -8,11 +8,10 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { faHeart as faHeartRegular } from "@fortawesome/free-regular-svg-icons";
 
-export default function Post({ postProps, userProps, appProps }: any) {
+export default function Post({ postProps, userProps, appProps }: PostProps) {
   const { post, postId } = postProps;
   const { user, currentUser, updateUser } = userProps;
-  const { showProfile, setShowAlert, setPostToDelete, setGiveChoice } =
-    appProps;
+  const { showProfile, setShowAlert, setPostToDelete } = appProps;
   const [likedBy, setLikedBy] = useState(post.likedBy);
   const [text, setText] = useState(post.text?.slice(0, 137));
   const [showAll, setShowAll] = useState(false);
@@ -75,6 +74,7 @@ export default function Post({ postProps, userProps, appProps }: any) {
     } else {
       setShowAlert({
         showAlert: true,
+        giveChoice: false,
         alertMessage: "You need to be logged in to follow a user",
       });
     }
@@ -90,21 +90,20 @@ export default function Post({ postProps, userProps, appProps }: any) {
             <img src={author.smallPic} className="profile-pic"></img>
             <p className="username">{author.displayName}</p>
           </div>
-          {!isFollowed() && (
+          {(!isFollowed() || !user) && (
             <button className="follow" onClick={handleFollow}>
               Follow
             </button>
           )}
-          {author.uid == currentUser.uid && (
+          {author.uid == currentUser.uid && user && (
             <button
               type="button"
               className="close-btn"
               onClick={() => {
-                setPostToDelete(postId);
                 setPostToDelete({ postId, postURL: post.postUrl });
-                setGiveChoice(true);
                 setShowAlert({
                   showAlert: true,
+                  giveChoice: true,
                   alertMessage: "Are you sure you want to delete this post?",
                 });
               }}
@@ -149,6 +148,7 @@ export default function Post({ postProps, userProps, appProps }: any) {
               onClick={() =>
                 setShowAlert({
                   showAlert: true,
+                  giveChoice: false,
                   alertMessage: "You need to be logged in to like a post",
                 })
               }

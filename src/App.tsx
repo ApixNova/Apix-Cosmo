@@ -5,6 +5,7 @@ import Profile from "./Profile";
 import person from "./assets/person.svg";
 import starPatternLeft from "./assets/star pattern left.png";
 import starPatternRight from "./assets/star pattern right.png";
+import mainPic from "./assets/main.jpg";
 
 import { useState, useEffect } from "react";
 import { initializeApp } from "firebase/app";
@@ -46,7 +47,7 @@ export const storage = getStorage();
 export const postsRef = collection(db, "posts");
 const usersRef = collection(db, "users");
 
-export const usernameStructure: User = {
+export const usernameStructure: CurrentUser = {
   uid: "",
   smallPic: "",
   fullPic: "",
@@ -54,9 +55,6 @@ export const usernameStructure: User = {
   docId: "",
   followList: [],
 };
-
-export const mainPic =
-  "https://firebasestorage.googleapis.com/v0/b/apix-cosmo.appspot.com/o/public%2Fmain.jpg?alt=media&token=c0cfd097-a91d-492a-8f92-91b0bdeb4b86";
 
 export async function getUserInfo(id: string) {
   const uid = id;
@@ -107,7 +105,7 @@ function App() {
   const [user] = useAuthState(auth);
   const [newPost, setNewPost] = useState(false);
   const [image, setImage] = useState<File | null>(null);
-  const [profileId, setProfileId] = useState<String>("");
+  const [profileId, setProfileId] = useState("");
   const [text, setText] = useState("");
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
@@ -121,9 +119,9 @@ function App() {
   });
   const [showAlert, setShowAlert] = useState({
     showAlert: false,
+    giveChoice: false,
     alertMessage: "",
   });
-  const [giveChoice, setGiveChoice] = useState(false);
   const [postToDelete, setPostToDelete] = useState({ postId: "", postURL: "" });
 
   async function handleDelete(confirmed: boolean) {
@@ -134,35 +132,35 @@ function App() {
           console.log("delete post: " + postToDelete);
           await deleteDoc(doc(db, "posts", postToDelete.postId));
           const refToDelete = ref(storage, postToDelete.postURL);
-          console.log("URL: " + postToDelete.postURL);
           await deleteObject(refToDelete).catch((e) =>
             console.log(JSON.stringify(e))
           );
           setShowAlert({
             showAlert: true,
+            giveChoice: false,
             alertMessage: "Post Succesfully deleted",
           });
-          setGiveChoice(false);
           setPostToDelete({ postId: "", postURL: "" });
         } catch (e) {
           setShowAlert({
             showAlert: true,
+            giveChoice: false,
             alertMessage: "Error: " + JSON.stringify(e),
           });
         }
       } else {
-        setGiveChoice(false);
         setShowAlert({
           showAlert: true,
+          giveChoice: false,
           alertMessage: "You must be logged in to delete your posts",
         });
       }
     } else {
       setShowAlert({
         showAlert: false,
+        giveChoice: false,
         alertMessage: "",
       });
-      setGiveChoice(false);
     }
   }
 
@@ -288,7 +286,7 @@ function App() {
     }
   }
 
-  function showProfile(userId: String) {
+  function showProfile(userId: string) {
     setProfileId(userId);
     setFilter("profile");
   }
@@ -299,6 +297,7 @@ function App() {
     } else {
       setShowAlert({
         showAlert: true,
+        giveChoice: false,
         alertMessage: "You must login to follow users",
       });
     }
@@ -328,14 +327,18 @@ function App() {
             <button
               className="close-btn"
               onClick={() =>
-                setShowAlert((prev) => ({ ...prev, showAlert: false }))
+                setShowAlert((prev) => ({
+                  ...prev,
+                  showAlert: false,
+                  giveChoice: false,
+                }))
               }
             >
               <FontAwesomeIcon className="close" icon={faPlus} />
             </button>
             <div className="separation"></div>
             <p>{showAlert.alertMessage}</p>
-            {giveChoice && (
+            {showAlert.giveChoice && (
               <div className="choice">
                 <button className="confirm" onClick={() => handleDelete(true)}>
                   Yes
@@ -354,13 +357,6 @@ function App() {
               <>
                 <button onClick={() => showProfile(currentUser.uid)}>
                   Profile
-                </button>
-                <button
-                  onClick={() => {
-                    setShowUserOptions(true);
-                  }}
-                >
-                  Account Options
                 </button>
               </>
             )}
@@ -410,8 +406,8 @@ function App() {
                         type="file"
                         id="image-input"
                         accept="image/*"
-                        onChange={(e: any) => {
-                          setImage(e.target.files[0]);
+                        onChange={(e: React.ChangeEvent) => {
+                          setImage((e.target as HTMLInputElement).files![0]);
                         }}
                       ></input>
                       <img
@@ -458,8 +454,8 @@ function App() {
                 setShowAlert,
                 filter,
                 setPostToDelete,
-                setGiveChoice,
               }}
+              uid=""
             />
           </>
         )}
@@ -493,7 +489,7 @@ function App() {
         {showUserOptions && user && (
           <>
             <div className="background"></div>
-            <div id="user">
+            <div className="user-options">
               <button
                 type="button"
                 className="close-btn"
@@ -505,7 +501,7 @@ function App() {
               </button>
               <form onSubmit={changeUsername}>
                 <h2>
-                  <span className="tiny">✦</span>User Options
+                  <span className="tiny">✦</span>Change Username
                   <span className="tiny">✦</span>
                 </h2>
                 <div className="separation"></div>
@@ -543,8 +539,9 @@ function App() {
             <div className="separation"></div>
             <div className="about-text">
               <p>
-                Cosmo is a social media for people to share art. Created by{" "}
-                <span>Apix Nova</span>
+                Cosmo is a social media for people to share art.
+                <br />
+                Created by <span>Apix Nova</span>
               </p>
             </div>
           </div>
@@ -561,8 +558,8 @@ function App() {
               appProps={{
                 showProfile,
                 setShowAlert,
+                setShowUserOptions,
                 setPostToDelete,
-                setGiveChoice,
                 filter,
               }}
             />
