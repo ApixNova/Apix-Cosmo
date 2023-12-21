@@ -9,7 +9,12 @@ import mainPic from "./assets/main.jpg";
 
 import { useState, useEffect } from "react";
 import { initializeApp } from "firebase/app";
-import { GoogleAuthProvider, signInWithPopup, getAuth } from "firebase/auth";
+import {
+  GoogleAuthProvider,
+  getAuth,
+  signInWithRedirect,
+  getRedirectResult,
+} from "firebase/auth";
 import { useAuthState } from "react-firebase-hooks/auth";
 import {
   getFirestore,
@@ -176,6 +181,77 @@ function App() {
 
   useEffect(() => {
     updateUser();
+    getRedirectResult(auth).then((result) => {
+      if (result) {
+        async function handleSignIn() {
+          const { uid, displayName } = auth.currentUser as UserLogin;
+          const q = query(usersRef, where("uid", "==", uid));
+          const userSnap = await getDocs(q);
+          //after sign in check if user is in the user collection, otherwise create a
+          //new user
+
+          if (userSnap.empty) {
+            try {
+              //use the default profile pic
+              const refDefaultPic = ref(
+                storage,
+                `profile-pics/default/black.png`
+              );
+              const url = await getDownloadURL(refDefaultPic);
+              const smallPic = url;
+              const fullPic = url;
+              //check if displayName is available otherwise keep trying to add a number until it is
+              let available = false;
+              let nameToCheck = displayName;
+              let digit = 0;
+              while (!available) {
+                nameToCheck = digit == 0 ? displayName : displayName + digit;
+                const queryUsername = query(
+                  usersRef,
+                  where("displayName", "==", nameToCheck)
+                );
+                try {
+                  const snapshot = await getDocs(queryUsername);
+                  if (!snapshot.empty) {
+                    console.log(
+                      "not available for " + nameToCheck + ", next try..."
+                    );
+                    digit++;
+                  } else {
+                    console.log("available for" + nameToCheck);
+                    available = true;
+                  }
+                } catch (error) {
+                  //DEBUG
+                  console.log(JSON.stringify(error));
+                }
+              }
+              //DEBUG
+              console.log("addDoc called");
+              await addDoc(usersRef, {
+                uid,
+                smallPic,
+                fullPic,
+                displayName: nameToCheck,
+                followList: [uid],
+              });
+              console.log("addDoc resolved, trying to get the user info: ");
+              const queryToTest = query(usersRef, where("uid", "==", uid));
+              const snappy = await getDocs(queryToTest);
+              console.log(snappy.docs[0].data());
+              console.log("now, update user will be called: ");
+              updateUser();
+            } catch (error) {
+              //DEBUG
+              console.log(JSON.stringify(error));
+            }
+          } else {
+            console.log("user already in db");
+          }
+        }
+        handleSignIn();
+      }
+    });
   }, [user]);
 
   useEffect(() => {
@@ -352,7 +428,7 @@ function App() {
         )}
         {showUserMenu && (
           <div id="dropdown-menu">
-            <div>{user ? <SignOut /> : <SignIn updateUser={updateUser} />}</div>
+            <div>{user ? <SignOut /> : <SignIn />}</div>
             {user && (
               <>
                 <button onClick={() => showProfile(currentUser.uid)}>
@@ -435,7 +511,7 @@ function App() {
                         </h2>
                         <p>You need to be signed in to upload content</p>
                         <div className="sign-in-wrapper">
-                          <SignIn updateUser={updateUser} />
+                          <SignIn />
                         </div>
                       </div>
                     </>
@@ -571,80 +647,15 @@ function App() {
   );
 }
 
-function SignIn({ updateUser }: SignInProps) {
+function SignIn() {
   async function signInWithGoogle() {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({
       prompt: "select_account",
     });
     try {
-      await signInWithPopup(auth, provider);
-      const { uid, displayName } = auth.currentUser as UserLogin;
-      const q = query(usersRef, where("uid", "==", uid));
-
-      //DEBUG
-      console.log("getDocs called (checkUserData)");
-      const userSnap = await getDocs(q);
-      //after sign in check if user is in the user collection, otherwise create a
-      //new user
-
-      if (userSnap.empty) {
-        try {
-          //use the default profile pic
-          const refDefaultPic = ref(storage, `profile-pics/default/black.png`);
-          const url = await getDownloadURL(refDefaultPic);
-          const smallPic = url;
-          const fullPic = url;
-          //check if displayName is available otherwise keep trying to add a number until it is
-          let available = false;
-          let nameToCheck = displayName;
-          let digit = 0;
-          while (!available) {
-            nameToCheck = digit == 0 ? displayName : displayName + digit;
-            const queryUsername = query(
-              usersRef,
-              where("displayName", "==", nameToCheck)
-            );
-            try {
-              const snapshot = await getDocs(queryUsername);
-              if (!snapshot.empty) {
-                console.log(
-                  "not available for " + nameToCheck + ", next try..."
-                );
-                digit++;
-              } else {
-                console.log("available for" + nameToCheck);
-                available = true;
-              }
-            } catch (error) {
-              //DEBUG
-              console.log(JSON.stringify(error));
-            }
-          }
-          //DEBUG
-          console.log("addDoc called");
-          await addDoc(usersRef, {
-            uid,
-            smallPic,
-            fullPic,
-            displayName: nameToCheck,
-            followList: [uid],
-          });
-          console.log("addDoc resolved, trying to get the user info: ");
-          const queryToTest = query(usersRef, where("uid", "==", uid));
-          const snappy = await getDocs(queryToTest);
-          console.log(snappy.docs[0].data());
-          console.log("now, update user will be called: ");
-          updateUser();
-        } catch (error) {
-          //DEBUG
-          console.log(JSON.stringify(error));
-        }
-      } else {
-        console.log("user already in db");
-      }
+      await signInWithRedirect(auth, provider);
     } catch (error) {
-      //DEBUG
       console.log(JSON.stringify(error));
     }
   }

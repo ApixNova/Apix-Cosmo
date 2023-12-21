@@ -153,6 +153,7 @@ export default function Gallery({
         setIsLoading(false);
         if (data.docs.length < postLimit || data.empty) {
           setAllShown(true);
+          allShownRef.current = true;
         }
       })
       .catch((e) => {

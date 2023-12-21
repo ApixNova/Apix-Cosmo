@@ -11,9 +11,6 @@ type CurrentUser = {
   followList: string[];
   docId: string;
 };
-type SignInProps = {
-  updateUser: () => void;
-};
 type ProfileProps = {
   userProps: {
     user: User | null | undefined;
