@@ -1,49 +1,13 @@
 import { useState, useEffect, useRef, ChangeEvent } from "react";
 import { updateDoc, doc, arrayRemove } from "firebase/firestore";
-import { db, getUserInfo, storage, usernameStructure } from "./App";
+import { db, storage, usernameStructure } from "./App";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import Resizer from "react-image-file-resizer";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faPlus } from "@fortawesome/free-solid-svg-icons";
 
 import Gallery from "./Gallery";
 
-async function resizePic(
-  file: File
-): Promise<string | File | Blob | ProgressEvent<FileReader>> {
-  return new Promise((resolve) => {
-    Resizer.imageFileResizer(
-      file,
-      70,
-      70,
-      "JPEG",
-      100,
-      0,
-      (uri) => {
-        resolve(uri);
-      },
-      "file"
-    );
-  });
-}
-async function resizeFullPic(
-  file: File
-): Promise<string | File | Blob | ProgressEvent<FileReader>> {
-  return new Promise((resolve) => {
-    Resizer.imageFileResizer(
-      file,
-      500,
-      500,
-      "JPEG",
-      100,
-      0,
-      (uri) => {
-        resolve(uri);
-      },
-      "file"
-    );
-  });
-}
+import { getUserInfo, resizePic } from "./utils";
 
 export default function Profile({ userProps, appProps }: ProfileProps) {
   const [userInfo, setUserInfo] = useState(usernameStructure);
@@ -80,9 +44,9 @@ export default function Profile({ userProps, appProps }: ProfileProps) {
           alertMessage: "Loading...",
         });
         //upload new one
-        const fullPic = await resizeFullPic(newProfilePic);
+        const fullPic = await resizePic(newProfilePic, "full");
         await uploadBytes(refFullPic, fullPic as File);
-        const smallPic = await resizePic(newProfilePic);
+        const smallPic = await resizePic(newProfilePic, "small");
         //upload the smaller one
         await uploadBytes(refSmallPic, smallPic as File);
         const userRef = doc(db, "users", currentUser.docId);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { auth, db, getUserInfo, postsRef, usernameStructure } from "./App";
+import { auth, db, postsRef, usernameStructure } from "./App";
 import { doc, updateDoc, arrayUnion } from "firebase/firestore";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
@@ -7,6 +7,7 @@ import {
   faHeart as faHeartSolid,
 } from "@fortawesome/free-solid-svg-icons";
 import { faHeart as faHeartRegular } from "@fortawesome/free-regular-svg-icons";
+import { getUserInfo } from "./utils";
 
 export default function Post({ postProps, userProps, appProps }: PostProps) {
   const { post, postId } = postProps;

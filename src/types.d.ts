@@ -58,3 +58,4 @@ type PostProps = {
     setPostToDelete: React.SetStateAction;
   };
 };
+type ResizePic = Promise<string | File | Blob | ProgressEvent<FileReader>>;

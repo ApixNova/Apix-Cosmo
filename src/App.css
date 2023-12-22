@@ -106,7 +106,6 @@ header img {
   transform: translate(-50%, -50%);
   width: 80vw;
   max-width: 700px;
-  height: 50vh;
   background: rgb(30, 29, 32);
   border: 2px solid rgb(236, 230, 231);
   display: flex;
@@ -148,10 +147,24 @@ header img {
   border-radius: 10px;
   font-size: 20px;
   margin: auto;
+  color: rgb(214, 214, 214);
 }
 .user-options p {
   font-size: 20px;
   font-family: "Space Grotesk", sans-serif;
+}
+@media screen and (max-width: 500px) {
+  .user-options h2 {
+    font-size: 2em;
+  }
+}
+@media screen and (max-width: 416px) {
+  .user-options h2 {
+    font-size: 1.5em;
+  }
+  .user-options p {
+    font-size: 18px;
+  }
 }
 /* username availability */
 .valid {
@@ -222,15 +235,19 @@ header img {
 }
 /* User Options */
 .info {
-  gap: inherit;
+  gap: 10px;
   display: flex;
   flex-direction: column;
 }
 .info .separation {
   width: 90%;
 }
-.info button:not(:nth-child(1)) {
+.info button:not(:nth-of-type(1)) {
   margin: auto;
+  border: 1px solid rgb(119, 119, 119);
+}
+.info button:last-of-type {
+  margin-bottom: 10px;
 }
 .info img {
   width: 150px;
@@ -272,6 +289,10 @@ header img {
 .new-post input {
   margin: auto;
   width: fit-content;
+}
+.new-post textarea {
+  background: transparent;
+  color: rgb(226, 226, 226);
 }
 .new-post input::file-selector-button {
   color: white;
